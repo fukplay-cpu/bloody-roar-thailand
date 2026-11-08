@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10131a">
+<title>BR2 WebSocket Test</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:24px 18px;background:#10131a;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:640px;margin:24px auto}h1{font-size:28px;line-height:1.35}p{color:#aeb7c6;line-height:1.6}
+label{display:block;margin:22px 0 8px}input{width:100%;padding:16px;border-radius:14px;border:1px solid #596170;background:#202631;color:white;font-size:18px}
+button{padding:15px 18px;border:0;border-radius:14px;background:#2878f0;color:white;font-size:17px;font-weight:700;margin-top:14px;width:100%}
+button.secondary{background:#394354}.panel{background:#202631;border-radius:18px;padding:18px;margin-top:20px;line-height:1.7;overflow-wrap:anywhere}
+.pill{display:inline-block;padding:3px 10px;border-radius:20px;background:#344052}.muted{color:#9ba6b7;font-size:14px}
+ul{padding-left:24px}#log{font-family:ui-monospace,monospace;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body><main>
+<h1>ทดสอบ WebSocket ห้องออนไลน์ Bloody Roar 2</h1>
+<p>หน้านี้ทดสอบการรับสถานะห้องแบบเรียลไทม์ เปิดบนทั้งสองเครื่องแล้วใส่รหัสห้องเดียวกัน</p>
+<label for="code">รหัสห้อง</label>
+<input id="code" maxlength="6" placeholder="เช่น SQ8BD3" autocapitalize="characters" autocomplete="off">
+<button id="connect">เชื่อมต่อ WebSocket</button>
+<button id="disconnect" class="secondary">ตัดการเชื่อมต่อ</button>
+<section class="panel" id="result">ยังไม่ได้เชื่อมต่อ</section>
+<p class="muted" id="status">สถานะการเชื่อมต่อ: ยังไม่เริ่ม</p>
+<section class="panel"><strong>บันทึกเหตุการณ์</strong><div id="log">พร้อมทดสอบ</div></section>
+<script>
+const BASE="wss://br2-online-rooms.fukthefuk400.workers.dev";
+const $=id=>document.getElementById(id);
+let socket=null;
+function log(message){
+  const line=`[${new Date().toLocaleTimeString("th-TH")}] ${message}`;
+  $("log").textContent=line+"\n"+$("log").textContent;
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function showRoom(room){
+  const players=Array.isArray(room.players)?room.players:[];
+  $("result").innerHTML=
+    `<div>รหัสห้อง: <strong>${esc(room.code||$("code").value)}</strong></div>`+
+    `<div>สถานะห้อง: <span class="pill">${esc(room.status||"unknown")}</span></div>`+
+    `<div>ผู้เล่น: <strong>${players.length}/2</strong></div>`+
+    `<ul>${players.map(p=>`<li>${esc(p.name||"ผู้เล่น")}</li>`).join("")}</ul>`;
+}
+$("connect").addEventListener("click",()=>{
+  const code=$("code").value.trim().toUpperCase();
+  if(!/^[A-Z0-9]{6}$/.test(code)){
+    $("status").textContent="กรุณากรอกรหัสห้อง 6 ตัว";
+    return;
+  }
+  if(socket)socket.close();
+  $("code").value=code;
+  $("status").textContent="กำลังเชื่อมต่อ...";
+  $("log").textContent="";
+  socket=new WebSocket(`${BASE}/room/${code}/ws`);
+  socket.addEventListener("open",()=>{
+    $("status").textContent="เชื่อมต่อ WebSocket แล้ว";
+    log("WebSocket connected");
+  });
+  socket.addEventListener("message",event=>{
+    try{
+      const data=JSON.parse(event.data);
+      if(data.type==="state"&&data.room){
+        showRoom(data.room);
+        log(`ได้รับ state: ${data.room.status}, ผู้เล่น ${(data.room.players||[]).length}/2`);
+      }else if(data.type==="error"){
+        log("Server: "+data.message);
+        $("status").textContent=data.message;
+      }else{
+        log("ได้รับข้อความ: "+event.data);
+      }
+    }catch(e){log("อ่านข้อความไม่ได้: "+e.message);}
+  });
+  socket.addEventListener("close",event=>{
+    $("status").textContent=`การเชื่อมต่อปิดแล้ว (code ${event.code})`;
+    log(`WebSocket closed: ${event.code}`);
+  });
+  socket.addEventListener("error",()=>{
+    $("status").textContent="WebSocket เกิดข้อผิดพลาด";
+    log("WebSocket error — ตรวจว่า Worker ได้อัปเดตแล้ว");
+  });
+});
+$("disconnect").addEventListener("click",()=>{
+  if(socket)socket.close(1000,"ผู้ใช้ตัดการเชื่อมต่อ");
+  socket=null;
+  $("status").textContent="ตัดการเชื่อมต่อแล้ว";
+});
+</script>
+</main></body></html>
