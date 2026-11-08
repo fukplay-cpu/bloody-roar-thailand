@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BR2 Worker Range Diagnostic</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;padding:28px 18px 50px;background:#101010;color:#eee;font:17px/1.55 -apple-system,BlinkMacSystemFont,sans-serif}
+main{max-width:760px;margin:auto}h1{font-size:27px;line-height:1.25}p{color:#bbb}
+button{background:#d2b15e;color:#111;border:0;border-radius:12px;padding:17px 22px;font-size:18px;font-weight:700;width:100%;margin:16px 0;cursor:pointer}
+#status,.item{background:#242424;border-radius:12px;padding:16px;margin:12px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.item b{color:#e4c56f}.ok{color:#8cdb9a}.bad{color:#ff8b82}small{color:#999}
+</style>
+</head>
+<body><main>
+<h1>ทดสอบ Cloudflare Worker — Range Diagnostic</h1>
+<p>หน้านี้จะขอข้อมูลเพียง 1 KB หรือ 64 KB ต่อการทดสอบ ไม่ดาวน์โหลด ZIP ทั้งไฟล์ และไม่แก้ไขไฟล์เกม</p>
+<button id="run">เริ่มทดสอบทั้ง 4 จุด</button>
+<div id="status">รอเริ่มทดสอบ…</div>
+<div id="results"></div>
+<p><small>ขนาด ZIP ที่บันทึกไว้: 319,845,831 bytes</small></p>
+<script>
+const URL='https://br2-upload-gateway.fukthefuk400.workers.dev/?action=get';
+const SIZE=319845831;
+const tests=[
+  {name:'1. ต้นไฟล์ ZIP (1 KB)',start:0,end:1023},
+  {name:'2. ช่วงที่เคยล้มเหลว (1 KB)',start:319780274,end:319781297},
+  {name:'3. ท้ายไฟล์ ZIP (1 KB)',start:SIZE-1024,end:SIZE-1},
+  {name:'4. ท้ายไฟล์ ZIP (64 KB)',start:SIZE-65557,end:SIZE-1}
+];
+const status=document.getElementById('status'), results=document.getElementById('results'), btn=document.getElementById('run');
+function line(s){status.textContent=s}
+async function probe(t){
+  const box=document.createElement('div');box.className='item';box.textContent=t.name+'\nกำลังทดสอบ…';results.appendChild(box);
+  const started=performance.now();
+  try{
+    const r=await fetch(URL,{method:'GET',headers:{Range:`bytes=${t.start}-${t.end}`},cache:'no-store'});
+    const body=await r.arrayBuffer();
+    const cr=r.headers.get('Content-Range')||'(ไม่มี)';
+    const ar=r.headers.get('Accept-Ranges')||'(ไม่มี)';
+    const cl=r.headers.get('Content-Length')||'(ไม่มี)';
+    const ms=Math.round(performance.now()-started);
+    const pass=r.status===206 && body.byteLength===t.end-t.start+1 && cr.startsWith(`bytes ${t.start}-${t.end}/`);
+    box.innerHTML='';
+    const title=document.createElement('b');title.className=pass?'ok':'bad';title.textContent=(pass?'ผ่าน ✓':'ไม่ผ่าน ✕')+' — '+t.name;box.appendChild(title);
+    const detail=document.createElement('div');
+    detail.textContent=`HTTP: ${r.status}\nContent-Range: ${cr}\nAccept-Ranges: ${ar}\nContent-Length: ${cl}\nได้รับจริง: ${body.byteLength} bytes\nใช้เวลา: ${ms} ms`;
+    box.appendChild(detail);
+    return {name:t.name,pass,status:r.status,contentRange:cr,acceptRanges:ar,contentLength:cl,received:body.byteLength,ms};
+  }catch(e){
+    box.innerHTML='';
+    const title=document.createElement('b');title.className='bad';title.textContent='เกิดข้อผิดพลาด ✕ — '+t.name;box.appendChild(title);
+    const detail=document.createElement('div');detail.textContent=String(e);box.appendChild(detail);
+    return {name:t.name,pass:false,error:String(e)};
+  }
+}
+btn.addEventListener('click',async()=>{
+  btn.disabled=true;results.innerHTML='';const all=[];
+  try{
+    for(let i=0;i<tests.length;i++){line(`กำลังทดสอบ ${i+1}/4…`);all.push(await probe(tests[i]));}
+    const passed=all.filter(x=>x.pass).length;
+    line(`เสร็จแล้ว: ผ่าน ${passed}/4 จุด\nส่งภาพผลลัพธ์ทั้งหมดมาให้ผมดูได้เลย`);
+  }finally{btn.disabled=false;}
+});
+</script></main></body></html>
