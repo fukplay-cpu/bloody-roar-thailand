@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BR2 Online - Join Room Test</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;padding:28px 18px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#10131a;color:#f5f7fb}
+main{max-width:620px;margin:30px auto}
+h1{font-size:28px;line-height:1.35;margin:0 0 18px}
+p{color:#aeb7c6;line-height:1.6}
+label{display:block;margin:24px 0 8px;font-size:17px}
+input{width:100%;padding:17px;border-radius:16px;border:1px solid #596170;background:#202631;color:white;font-size:18px}
+button{width:100%;margin-top:18px;padding:18px;border:0;border-radius:16px;background:#2878f0;color:white;font-size:18px;font-weight:700}
+.result{white-space:pre-wrap;overflow-wrap:anywhere;background:#202631;padding:18px;border-radius:18px;margin-top:24px;line-height:1.6}
+.small{font-size:14px;color:#9ba6b7}
+</style>
+</head>
+<body>
+<main>
+<h1>ทดสอบเข้าห้องออนไลน์ Bloody Roar 2</h1>
+<p>หน้านี้ใช้ทดสอบผู้เล่นคนที่ 2 เท่านั้น ยังไม่เชื่อมต่อการต่อสู้ในเกม</p>
+<label for="name">ชื่อผู้เล่น</label>
+<input id="name" maxlength="20" value="ผู้เล่นคนที่ 2" autocomplete="nickname">
+<label for="code">รหัสห้อง 6 ตัว</label>
+<input id="code" maxlength="6" placeholder="เช่น 8FD24V" autocapitalize="characters" autocomplete="off">
+<button id="join">เข้าร่วมห้อง</button>
+<div id="result" class="result">กรอกรหัสห้อง แล้วกด “เข้าร่วมห้อง”</div>
+<p class="small">หากเข้าห้องสำเร็จ จำนวนผู้เล่นควรเป็น 2 คน และสถานะเป็น ready</p>
+</main>
+<script>
+const API="https://br2-online-rooms.fukthefuk400.workers.dev";
+const $=id=>document.getElementById(id);
+$("join").addEventListener("click", async()=>{
+  const code=$("code").value.trim().toUpperCase();
+  const name=$("name").value.trim()||"ผู้เล่นคนที่ 2";
+  const out=$("result");
+  if(!/^[A-Z0-9]{6}$/.test(code)){
+    out.textContent="กรุณากรอกรหัสห้องให้ครบ 6 ตัวอักษร/ตัวเลข";
+    return;
+  }
+  $("join").disabled=true;
+  $("join").textContent="กำลังเข้าห้อง...";
+  out.textContent="กำลังเชื่อมต่อ...";
+  try{
+    const res=await fetch(`${API}/room/${code}/join`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name})
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
+    localStorage.setItem(`br2-player-${code}`,data.playerId);
+    const room=data.room||{};
+    out.textContent=
+      `เข้าห้องสำเร็จ!\nรหัสห้อง: ${room.code||code}\nสถานะ: ${room.status||"ไม่ทราบ"}\nผู้เล่น: ${(room.players||[]).length} คน\n\nข้อมูลเต็ม:\n${JSON.stringify(data,null,2)}`;
+  }catch(err){
+    out.textContent="เข้าห้องไม่สำเร็จ: "+err.message;
+  }finally{
+    $("join").disabled=false;
+    $("join").textContent="เข้าร่วมห้อง";
+  }
+});
+</script>
+</body>
+</html>
