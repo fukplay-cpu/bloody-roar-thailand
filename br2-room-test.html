@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BR2 Online Rooms – ทดสอบสร้างห้อง</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#10131a;color:#f4f6fb;padding:24px;line-height:1.5}
+main{max-width:560px;margin:auto}input,button{font:inherit;padding:14px;border-radius:12px;border:1px solid #555;width:100%;box-sizing:border-box;margin:8px 0}
+input{background:#202631;color:white}button{background:#2775ed;color:white;border:0;font-weight:700}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#202631;padding:14px;border-radius:12px}
+.small{color:#b8c0cc;font-size:14px}
+</style>
+</head>
+<body><main>
+<h2>ทดสอบระบบห้องออนไลน์ Bloody Roar 2</h2>
+<p class="small">ทดสอบเฉพาะ API สร้างห้อง ยังไม่เชื่อมการต่อสู้หรือระบบเล่นคนเดียว</p>
+<label>ชื่อผู้เล่น</label>
+<input id="name" maxlength="20" value="ผู้เล่นทดสอบ">
+<button id="create">สร้างห้องทดสอบ</button>
+<h3>ผลการทดสอบ</h3>
+<pre id="out">กด “สร้างห้องทดสอบ” เพื่อเริ่ม</pre>
+</main>
+<script>
+const API="https://br2-online-rooms.fukthefuk400.workers.dev";
+const out=document.getElementById("out");
+document.getElementById("create").addEventListener("click",async()=>{
+  out.textContent="กำลังติดต่อ Worker...";
+  try{
+    const r=await fetch(API+"/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:document.getElementById("name").value})});
+    const data=await r.json();
+    if(!r.ok) throw new Error("HTTP "+r.status+" — "+JSON.stringify(data));
+    if(!data.room||!data.room.code) throw new Error("Worker ตอบกลับ แต่ไม่มีรหัสห้อง: "+JSON.stringify(data));
+    out.textContent="สร้างห้องสำเร็จ!\nรหัสห้อง: "+data.room.code+"\nสถานะ: "+data.room.status+"\nผู้เล่น: "+data.room.players.length+" คน\n\nข้อมูลเต็ม:\n"+JSON.stringify(data,null,2);
+  }catch(e){out.textContent="ทดสอบไม่สำเร็จ: "+e.message+"\n\nหากเป็น CORS หรือ Failed to fetch ให้แจ้งข้อความนี้กลับมา";}
+});
+</script></body></html>
