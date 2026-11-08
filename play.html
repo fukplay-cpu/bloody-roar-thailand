@@ -27,6 +27,8 @@
   #log.show{display:block} #log .err{color:#e0715f} #log .ok{color:#8fbf6a} #log .muted{color:#6a6a6a}
   #bar button{font:inherit;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);background:#141414;border:1px solid var(--line);border-radius:6px;padding:.42rem .6rem;cursor:pointer}
   #bar button:hover{border-color:var(--glow);color:#fff}
+  #extra-menu{display:flex;flex-wrap:wrap;gap:.4rem;flex-basis:100%;padding:.35rem .15rem .25rem 0;background:rgba(0,0,0,.78);border:1px solid var(--line);border-radius:8px}
+  #extra-menu[hidden]{display:none}
   #bar button.primary{background:var(--glow);color:#0a0a0a;border-color:var(--glow)}
   #btn-dot1.on,#btn-dot2.on,#btn-hd.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
   #bar .spacer{flex:1} #bar .tag{font-size:.6rem;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -58,6 +60,43 @@
   #pad .stick .knob{position:absolute;left:50%;top:50%;width:46%;height:46%;border-radius:50%;background:rgba(201,162,75,.55);transform:translate(-50%,-50%);pointer-events:none}
   #pad .stick.left{left:calc(var(--k)*3.5)} #pad .stick.right{right:calc(var(--k)*3.5)}
   @media (orientation:landscape){ #pad:not(.no-sticks) .stick{display:block} #pad .ds{display:flex} }
+  /* Custom controller layout: each digital control is independently positioned; D-Pad remains one group. */
+  #pad{inset:0;bottom:0;padding:0;--k:clamp(42px,13vw,60px)}
+  #pad .sh,#pad .row,#pad .se{display:contents}
+  #pad .sh .side{display:contents}
+  #pad .dpad{position:absolute;left:4%;top:61%;width:calc(var(--k)*3);height:calc(var(--k)*3);margin:0}
+  #pad .face{display:contents}
+  #pad .face button{position:absolute;width:var(--btn-size,var(--k));height:var(--btn-size,var(--k));padding:0}
+  /* Every digital key uses its own center anchor so scale and drag work independently. */
+  #pad .face .tri{left:88%;top:59%;transform:translate(-50%,-50%)}
+  #pad .face .sq{left:82%;top:70%;transform:translate(-50%,-50%)}
+  #pad .face .ci{left:94%;top:70%;transform:translate(-50%,-50%)}
+  #pad .face .cr{left:88%;top:81%;transform:translate(-50%,-50%)}
+  #pad .sh button{position:absolute;min-width:48px;min-height:34px;padding:.35rem .65rem;transform:translate(-50%,-50%)}
+  #pad [data-btn="l2"]{left:4%;top:48%} #pad [data-btn="l"]{left:13%;top:48%}
+  #pad [data-btn="r"]{left:87%;top:48%} #pad [data-btn="r2"]{left:96%;top:48%}
+  #pad .se button{position:absolute;min-height:34px;padding:.4rem .8rem;transform:translate(-50%,-50%)}
+  #pad [data-btn="select"]{left:42%;top:88%} #pad [data-btn="start"]{left:52%;top:88%}
+  #pad .stick{z-index:1}
+  #pad .stick.left{left:calc(var(--k)*3.5)} #pad .stick.right{right:calc(var(--k)*3.5)}
+  #pad.edit-mode{pointer-events:auto;z-index:24;background:rgba(0,0,0,.08);touch-action:none}
+  #pad.edit-mode button,#pad.edit-mode .dpad{outline:1px dashed rgba(75,155,255,.9);outline-offset:3px}
+  #pad.edit-mode .stick{pointer-events:none;opacity:.25}
+  #pad .layout-item{touch-action:none}
+  #pad-editor{position:fixed;z-index:28;left:12px;top:max(58px,env(safe-area-inset-top));right:auto;width:min(290px,calc(100vw - 24px));padding:10px;background:rgba(12,12,14,.96);border:1px solid #d34b4b;border-radius:12px;color:#f4f4f4;font:13px system-ui,sans-serif;box-shadow:0 8px 30px #0009;touch-action:pan-y}
+  #pad-editor header{cursor:move;touch-action:none;user-select:none}
+  #pad-editor header strong{flex:1}
+  #pad-editor header button{touch-action:manipulation}
+  #pad-editor[hidden]{display:none}
+  #pad-editor header,#pad-editor footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  #pad-editor header{font-size:15px;margin-bottom:8px}
+  #pad-editor label{display:block;margin:8px 0;font-size:12px}
+  #pad-editor select,#pad-editor input{display:block;width:100%;margin-top:6px}
+  #pad-editor output{float:right;color:#ffb4b4}
+  #pad-editor p{font-size:10px;line-height:1.35;color:#c4c4c4}
+  #pad-editor button{background:#242428;color:#fff;border:1px solid #777;border-radius:8px;padding:8px 10px}
+  #pad-editor #pad-save{background:#147d39;border-color:#1cbd58}
+  @media(max-width:600px){#pad-editor{width:min(290px,calc(100vw - 16px));font-size:12px}}
   #loader{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1rem;background:radial-gradient(120% 90% at 50% 30%,#101014 0%,#050506 72%);text-align:center;padding:1.2rem}
   #loader.hidden{display:none}
   #loader-close{position:absolute;top:max(.7rem,env(safe-area-inset-top));right:1rem;width:34px;height:34px;border-radius:50%;background:#141414;border:1px solid var(--line);color:var(--ink);cursor:pointer;font-size:.9rem;display:none}
@@ -76,45 +115,53 @@
 </head>
 <body>
   <div id="stage">
-    <button id="eye" aria-label="Afficher ou masquer l'interface" title="Afficher/masquer l'interface">
+    <button id="eye" aria-label="แสดงหรือซ่อนแถบควบคุม" title="แสดง/ซ่อนแถบควบคุม">
       <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
       <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 6.2A10.8 10.8 0 0 1 12 5c7 0 10.5 7 10.5 7a17 17 0 0 1-3.2 4M6.3 7.9A17 17 0 0 0 1.5 12S5 19 12 19a10.6 10.6 0 0 0 4.1-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
     </button>
     <canvas id="screen" width="320" height="240" tabindex="0"></canvas>
     <div id="bar" aria-label="Contrôles">
       <span class="tag" id="tag">Lecteur PSX</span>
-      <button data-act="menu" class="primary">Menu</button>
-      <button data-act="loadrom">Changer de jeu</button>
-      <button data-act="disc" id="btn-disc" style="display:none">Disque 1/1</button>
-      <button data-act="fs">Plein écran</button>
-      <button data-act="pad">Manette</button>
-      <button data-act="dot1" id="btn-dot1" title="Filtre dot (effectif au prochain lancement)">Dot</button>
-      <button data-act="dot2" id="btn-dot2" title="Filtre dot 2× — points plus gros (effectif au prochain lancement)">Dot 2×</button>
-      <button data-act="hd" id="btn-hd" title="Résolution interne ×2 — 3D plus nette (effectif au prochain lancement ; coûte en perf)">HD</button>
-      <button data-act="savestate">Sauver état</button>
-      <button data-act="loadstate">Charger état</button>
-      <button data-act="exportstate">Exporter état</button>
-      <button data-act="importstate">Importer état</button>
-      <button data-act="exportsram">Exporter carte mém.</button>
-      <button data-act="importsram">Importer carte mém.</button>
-      <span class="spacer"></span>
-      <button data-act="togglelog">Journal</button>
+      <button data-act="menu" class="primary" aria-expanded="false" aria-controls="extra-menu">เมนู</button>
+      <button data-act="fs">เต็มหน้าจอ</button>
+      <button data-act="pad">ปุ่มควบคุม</button>
+      <button data-act="editpad">ปรับแต่งปุ่มควบคุม</button>
+      <button data-act="hd" id="btn-hd" title="เพิ่มความละเอียดภายใน 2 เท่า ภาพ 3 มิติคมชัดขึ้น แต่อาจใช้ประสิทธิภาพเครื่องมากขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">HD</button>
+      <button data-act="savecurrent" class="primary">บันทึก</button>
+      <button data-act="resetgame" title="เริ่มเกมปัจจุบันใหม่จากหน้าเริ่มต้น">รีเซ็ทเกม</button>
+      <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
+        <button data-act="dot1" id="btn-dot1" title="เปิด/ปิดฟิลเตอร์จุดภาพ (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ</button>
+        <button data-act="dot2" id="btn-dot2" title="ฟิลเตอร์จุดภาพ 2 เท่า — จุดใหญ่ขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ 2×</button>
+        <button data-act="importstate">นำเข้าสถานะเกม</button>
+        <button data-act="exportstate">ส่งออกสถานะเกม</button>
+        <button data-act="exportsram">ส่งออก Memory Card</button>
+        <button data-act="importsram">นำเข้า Memory Card</button>
+      </div>
     </div>
     <div id="pad" aria-hidden="true"></div>
+    <section id="pad-editor" hidden aria-label="ปรับแต่งปุ่มควบคุม">
+      <header><strong>ปรับแต่งปุ่มควบคุม</strong><button type="button" id="pad-editor-close" aria-label="ปิด">✕</button></header>
+      <label>เลือกปุ่ม<select id="pad-target"></select></label>
+      <label>ขนาดปุ่ม <output id="pad-size-value">100%</output><input id="pad-size" type="range" min="50" max="180" value="100"></label>
+      <label>ความโปร่งใส <output id="pad-opacity-value">100%</output><input id="pad-opacity" type="range" min="20" max="100" value="100"></label>
+      <p>ลากหัวข้อหน้าต่างเพื่อย้ายแผงนี้ • ลากปุ่มบนหน้าจอเพื่อย้ายตำแหน่ง • D-Pad ปรับเป็นกลุ่มเดียว</p>
+      <footer><button type="button" id="pad-reset">คืนค่าตำแหน่ง</button><button type="button" id="pad-save">บันทึกการตั้งค่า</button></footer>
+    </section>
     <div id="loader">
       <button id="loader-close" title="Fermer">✕</button>
       <button id="resume-game" style="display:none">◀ Retour au jeu</button>
       <div class="crest">Émulateur · PlayStation</div>
       <div class="title">Lecteur PSX</div>
       <div class="sub">Charge un disque depuis ton appareil</div>
-      <button id="continue-game" style="display:none">▶ Continuer</button>
-      <button id="pick">Charger un disque</button>
+      <button id="continue-game" style="display:none">▶ เล่นต่อ</button>
+      <button id="pick">เลือกไฟล์เกมจากเครื่อง</button>
       <button id="load-server-game" type="button" style="font:inherit;font-size:.9rem;letter-spacing:.04em;padding:.72rem 1.2rem;border-radius:10px;cursor:pointer;color:#111;background:#f1f1f1;border:1px solid #777;max-width:92%">
-        ▶ Charger Bloody Roar 2 depuis le serveur
+        ▶ ดาวน์โหลด Bloody Roar 2 จากเซิร์ฟเวอร์
       </button>
+      <p id="download-instruction" style="max-width:92%;margin:.75rem auto 1rem;color:#f0d58a;font-size:.88rem;line-height:1.65;text-align:center">กดปุ่มสีขาวเพื่อดาวน์โหลดเกมก่อน รอให้ดาวน์โหลดครบ 100% แล้วจึงเข้าเล่นเกมได้</p>
 
       <button id="clearmem" style="display:none">🗑 Vider la mémoire pour lancer un autre jeu</button>
-      <div id="bios-row">BIOS : <span id="bios-state">HLE (intégré)</span> · <a id="pick-bios">ajouter scph…bin</a></div>
+      <div id="bios-row">BIOS: <span id="bios-state">HLE (มีในระบบ)</span> · <a id="pick-bios">เพิ่มไฟล์ scph…bin</a></div>
       <button id="br2-log-toggle" type="button" style="margin:.5rem auto;padding:.45rem .8rem;border:1px solid #555;border-radius:8px;background:#171717;color:#ddd;font:inherit;font-size:.8rem">Afficher le journal / แสดงบันทึก</button>
       <div id="br2-auto-diagnostic" style="display:none;margin:.65rem auto;padding:.7rem .8rem;max-width:92%;border:1px solid #9b8145;border-radius:9px;background:#211d13;color:#f0d58a;text-align:left;font-size:.72rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere">
         <strong>ผลตรวจอัตโนมัติ / Diagnostic</strong><div id="br2-auto-diagnostic-text"></div>
@@ -3822,7 +3869,7 @@ void main()
       var sid=await getStoredId(); var rec=sid?await getStoredDiscs(sid):null; var hasStored=!!rec;
       // Un jeu en mémoire → « Continuer » (si aucun ne tourne) + « Vider la mémoire » ; « Charger un disque » disparaît.
       // Rien en mémoire → seul « Charger un disque ».
-      if(cont){ if(rec && !ng){ cont.textContent='▶ Continuer — '+(rec.name||'jeu'); cont.setAttribute('data-id', sid); cont.style.display=''; } else cont.style.display='none'; }
+      if(cont){ if(rec && !ng){ cont.textContent='▶ เล่นต่อ — '+(rec.name||'เกม'); cont.setAttribute('data-id', sid); cont.style.display=''; } else cont.style.display='none'; }
       if(pick){ pick.style.display = hasStored ? 'none' : ''; }
       if(clr){ clr.style.display = hasStored ? '' : 'none'; }
     }
@@ -3855,10 +3902,10 @@ void main()
     function updateDpad(e){ if(!dpadEl) return; var r=dpadEl.getBoundingClientRect(); var nx=(e.clientX-r.left)/r.width*2-1, ny=(e.clientY-r.top)/r.height*2-1; var dead=(Math.abs(nx)<0.28&&Math.abs(ny)<0.28); pressDir('left',!dead&&nx<-0.30); pressDir('right',!dead&&nx>0.30); pressDir('up',!dead&&ny<-0.30); pressDir('down',!dead&&ny>0.30); }
     function clearDpad(){ pressDir('up',false); pressDir('down',false); pressDir('left',false); pressDir('right',false); dpadPointer=null; }
     function buildPad(){
-      pad.innerHTML='<div class="sh"><div class="side"><button data-btn="l2">L2</button><button data-btn="l">L1</button></div><div class="side"><button data-btn="r">R1</button><button data-btn="r2">R2</button></div></div>'
-        +'<div class="row"><div class="dpad" id="dpad"><span class="hub"></span><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span></div>'
-        +'<div class="face"><button class="tri" data-btn="x">△</button><button class="sq" data-btn="y">□</button><button class="ci" data-btn="a">○</button><button class="cr" data-btn="b">✕</button></div></div>'
-        +'<div class="se"><button data-btn="select">Select</button><button data-btn="start">Start</button></div>'
+      pad.innerHTML='<div class="sh"><div class="side"><button data-btn="l2" data-layout-id="l2">L2</button><button data-btn="l" data-layout-id="l1">L1</button></div><div class="side"><button data-btn="r" data-layout-id="r1">R1</button><button data-btn="r2" data-layout-id="r2">R2</button></div></div>'
+        +'<div class="row"><div class="dpad layout-item" id="dpad" data-layout-id="dpad"><span class="hub"></span><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span></div>'
+        +'<div class="face"><button class="tri" data-btn="x" data-layout-id="triangle">△</button><button class="sq" data-btn="y" data-layout-id="square">□</button><button class="ci" data-btn="a" data-layout-id="circle">○</button><button class="cr" data-btn="b" data-layout-id="cross">✕</button></div></div>'
+        +'<div class="se"><button data-btn="select" data-layout-id="select">Select</button><button data-btn="start" data-layout-id="start">Start</button></div>'
         +'<div class="ds"><button id="ds-toggle" type="button">DualShock</button></div>'
         +'<div class="stick left" id="stickL"><span class="knob"></span></div><div class="stick right" id="stickR"><span class="knob"></span></div>';
       dpadEl=document.getElementById('dpad'); dpadPointer=null; dpadDirs={up:false,down:false,left:false,right:false};
@@ -3881,17 +3928,128 @@ void main()
           try{ localStorage.setItem('psx_sticks', sticksOn?'1':'0'); }catch(_){ } applyDs(); });
         applyDs();
       }
-      var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse) pad.classList.add('show');
+      var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse) pad.classList.add('show'); applyPadLayout();
     }
+    // Custom controller editor. Layout is stored per device; D-Pad is intentionally one movable/resizable group.
+    var padLayoutKey='br2_controller_layout_v1', padLayout={}, padEditActive=false, padDrag=null;
+    var padNames={dpad:'D-Pad (ทั้งชุด)',triangle:'△ สามเหลี่ยม',square:'□ สี่เหลี่ยม',circle:'○ วงกลม',cross:'✕ กากบาท',l1:'L1',l2:'L2',r1:'R1',r2:'R2',start:'START',select:'SELECT'};
+    function loadPadLayout(){try{padLayout=JSON.parse(localStorage.getItem(padLayoutKey)||'{}')||{};}catch(_){padLayout={};}}
+    function padItem(id){return pad.querySelector('[data-layout-id="'+id+'"]');}
+    function applyPadLayout(){
+      Object.keys(padNames).forEach(function(id){
+        var el=padItem(id); if(!el)return;
+        var v=padLayout[id]||{}, scale=Number(v.scale)||100, opacity=Number(v.opacity)||100;
+        if(typeof v.x==='number' && typeof v.y==='number'){
+          el.style.left=v.x+'%'; el.style.top=v.y+'%'; el.style.right='auto';
+        }
+        if(id==='dpad'){
+          el.style.width='calc(var(--k)*3)'; el.style.height='calc(var(--k)*3)';
+          el.style.transform='scale('+(scale/100)+')'; el.style.transformOrigin='top left';
+        } else {
+          // Keep each button's native shape/dimensions; transform scales that button only.
+          el.style.transform='translate(-50%,-50%) scale('+(scale/100)+')';
+          el.style.transformOrigin='center center';
+        }
+        el.style.opacity=String(Math.max(20,Math.min(100,opacity))/100);
+      });
+    }
+    function savePadLayout(){try{localStorage.setItem(padLayoutKey,JSON.stringify(padLayout));}catch(_){log('ไม่สามารถบันทึกตำแหน่งปุ่มในเครื่องนี้ได้','err');}}
+    function setupPadEditor(){
+      var sel=document.getElementById('pad-target'),size=document.getElementById('pad-size'),opacity=document.getElementById('pad-opacity');
+      if(!sel||sel.options.length)return;
+      Object.keys(padNames).forEach(function(id){var o=document.createElement('option');o.value=id;o.textContent=padNames[id];sel.appendChild(o);});
+      function current(){return padLayout[sel.value]||(padLayout[sel.value]={scale:100,opacity:100});}
+      function refresh(){var v=current();size.value=v.scale||100;opacity.value=v.opacity||100;document.getElementById('pad-size-value').textContent=size.value+'%';document.getElementById('pad-opacity-value').textContent=opacity.value+'%';}
+      sel.addEventListener('change',refresh);
+      size.addEventListener('input',function(){current().scale=+size.value;document.getElementById('pad-size-value').textContent=size.value+'%';applyPadLayout();});
+      opacity.addEventListener('input',function(){current().opacity=+opacity.value;document.getElementById('pad-opacity-value').textContent=opacity.value+'%';applyPadLayout();});
+      document.getElementById('pad-save').addEventListener('click',function(){savePadLayout();closePadEditor();log('บันทึกการจัดวางปุ่มแล้ว','ok');});
+      document.getElementById('pad-reset').addEventListener('click',function(){padLayout={};applyPadLayout();refresh();});
+      document.getElementById('pad-editor-close').addEventListener('click',closePadEditor);
+      refresh();
+    }
+    function openPadEditor(){if(!pad.classList.contains('show'))pad.classList.add('show');buildPadIfNeeded();setupPadEditor();padEditActive=true;pad.classList.add('edit-mode');pad.setAttribute('aria-hidden','false');document.getElementById('pad-editor').hidden=false;applyPadLayout();}
+    function buildPadIfNeeded(){if(!pad.querySelector('[data-layout-id]'))buildPad();}
+    function closePadEditor(){padEditActive=false;pad.classList.remove('edit-mode');document.getElementById('pad-editor').hidden=true;releaseAll();}
+    function installPadDrag(){
+      pad.addEventListener('pointerdown',function(e){
+        if(!padEditActive)return;
+        var el=e.target.closest('[data-layout-id]'); if(!el)return;
+        e.preventDefault(); e.stopPropagation();
+        var id=el.getAttribute('data-layout-id'),r=el.getBoundingClientRect(),pr=pad.getBoundingClientRect();
+        // The most recently touched/moved control becomes the active resize target.
+        var targetSelect=document.getElementById('pad-target');
+        if(targetSelect && targetSelect.value!==id){targetSelect.value=id;targetSelect.dispatchEvent(new Event('change',{bubbles:true}));}
+        var anchorX=id==='dpad'?r.left:r.left+r.width/2;
+        var anchorY=id==='dpad'?r.top:r.top+r.height/2;
+        padDrag={id:id,el:el,dx:e.clientX-anchorX,dy:e.clientY-anchorY,pointerId:e.pointerId};
+        try{pad.setPointerCapture(e.pointerId);}catch(_){}
+      },true);
+      pad.addEventListener('pointermove',function(e){
+        if(!padEditActive||!padDrag||e.pointerId!==padDrag.pointerId)return;
+        e.preventDefault();
+        var pr=pad.getBoundingClientRect(),el=padDrag.el,id=padDrag.id;
+        var px=e.clientX-padDrag.dx-pr.left, py=e.clientY-padDrag.dy-pr.top;
+        var x=Math.max(2,Math.min(98,px/pr.width*100)),y=Math.max(3,Math.min(97,py/pr.height*100));
+        var v=padLayout[id]||(padLayout[id]={scale:100,opacity:100});v.x=x;v.y=y;
+        el.style.left=x+'%';el.style.top=y+'%';el.style.right='auto';
+        if(id==='dpad'){el.style.transform='scale('+(Number(v.scale)||100)/100+')';el.style.transformOrigin='top left';}
+        else{el.style.transform='translate(-50%,-50%) scale('+(Number(v.scale)||100)/100+')';el.style.transformOrigin='center center';}
+      });
+      function end(e){if(padDrag&&(!e||e.pointerId===padDrag.pointerId))padDrag=null;}
+      pad.addEventListener('pointerup',end);pad.addEventListener('pointercancel',end);pad.addEventListener('lostpointercapture',end);
+    }
+    // The settings panel can be dragged independently by its header.
+    function installEditorPanelDrag(){
+      var panel=document.getElementById('pad-editor'), handle=panel&&panel.querySelector('header');
+      if(!panel||!handle)return;
+      var drag=null;
+      handle.addEventListener('pointerdown',function(e){
+        if(e.target.closest('button'))return;
+        e.preventDefault();
+        var r=panel.getBoundingClientRect();
+        drag={id:e.pointerId,dx:e.clientX-r.left,dy:e.clientY-r.top};
+        try{handle.setPointerCapture(e.pointerId);}catch(_){}
+      });
+      handle.addEventListener('pointermove',function(e){
+        if(!drag||e.pointerId!==drag.id)return;
+        e.preventDefault();
+        var w=panel.offsetWidth,h=panel.offsetHeight;
+        var x=Math.max(0,Math.min(window.innerWidth-w,e.clientX-drag.dx));
+        var y=Math.max(0,Math.min(window.innerHeight-h,e.clientY-drag.dy));
+        panel.style.left=x+'px';panel.style.top=y+'px';panel.style.right='auto';panel.style.bottom='auto';
+      });
+      function end(e){if(drag&&(!e||e.pointerId===drag.id))drag=null;}
+      handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);handle.addEventListener('lostpointercapture',end);
+    }
+    installEditorPanelDrag();
+    loadPadLayout();installPadDrag();
     function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng)ng.pressUp(n); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
     window.addEventListener('blur',releaseAll); document.addEventListener('visibilitychange',function(){ if(document.hidden) releaseAll(); });
 
     var fitT=null;
-    function fit(){ var vw=window.innerWidth,vh=window.innerHeight,portrait=vh>=vw,top=0,bottom=0;
-      if(portrait){ if(!document.body.classList.contains('chrome-off')&&bar) top=bar.offsetHeight; if(pad&&pad.classList.contains('show')) bottom=pad.offsetHeight; }
-      stage.style.paddingTop=top+'px'; stage.style.paddingBottom=bottom+'px';
-      var availW=vw,availH=Math.max(80,vh-top-bottom),A=ASPECT,w=availW,h=w/A; if(h>availH){h=availH;w=h*A;}
-      canvas.style.setProperty('width',Math.round(w)+'px','important'); canvas.style.setProperty('height',Math.round(h)+'px','important'); }
+    function fit(){ var vw=window.innerWidth,vh=window.innerHeight,top=0;
+      // Touch controls are a transparent overlay covering the viewport, not a layout row.
+      // In fullscreen mode the game uses the entire viewport immediately; the toolbar remains an overlay.
+      // Never subtract #pad.offsetHeight: #pad is inset:0 and therefore equals the full screen.
+      if(!document.body.classList.contains('fullscreen-mode') && bar && !document.body.classList.contains('chrome-off')) top=Math.min(bar.offsetHeight,Math.round(vh*.22));
+      stage.style.paddingTop='0px'; stage.style.paddingBottom='0px';
+      var availW=vw,availH=Math.max(80,vh-top),A=ASPECT,w=availW,h=w/A;
+      if(h>availH){h=availH;w=h*A;}
+      canvas.style.setProperty('width',Math.round(w)+'px','important');
+      canvas.style.setProperty('height',Math.round(h)+'px','important');
+    }
+    function syncFullscreenState(){
+      var active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+      if(!active && document.body.classList.contains('fullscreen-mode')){
+        // If native fullscreen was externally dismissed, restore the normal layout.
+        document.body.classList.remove('fullscreen-mode');
+        var fbtn=document.querySelector('#bar [data-act="fs"]'); if(fbtn) fbtn.textContent='เต็มหน้าจอ';
+      }
+      requestAnimationFrame(fit);
+    }
+    document.addEventListener('fullscreenchange',syncFullscreenState);
+    document.addEventListener('webkitfullscreenchange',syncFullscreenState);
     window.addEventListener('resize',function(){ clearTimeout(fitT); fitT=setTimeout(fit,60); });
     window.addEventListener('orientationchange',function(){ setTimeout(fit,150); setTimeout(fit,450); });
 
@@ -4032,7 +4190,7 @@ void main()
     async function launchDisc(mainFile, u8, extraFiles){
       if(busy) return; busy=true; br2Mark('launch-disc-start',mainFile.name+' '+mainFile.size+' bytes');
       try{
-        isMulti=false; discs=[]; document.getElementById('btn-disc').style.display='none';
+        isMulti=false; discs=[]; var discButton=document.getElementById('btn-disc'); if(discButton) discButton.style.display='none';
         curExt=detectExt(mainFile.name); curName=baseName(mainFile.name); curFile=mainFile; romId=quickId(mainFile.name,mainFile.size);
         tag.textContent=curName; buildPad();
         showStatus('Initialisation du core pcsx_rearmed… (plusieurs secondes possibles)'); setProgress(null);
@@ -4116,6 +4274,109 @@ void main()
     function br2U16(v, p) { return v.getUint16(p, true); }
     function br2U32(v, p) { return v.getUint32(p, true); }
 
+    // Safari iOS 15-25 รองรับ OPFS แต่ยังไม่มี FileSystemFileHandle.createWritable().
+    // ใช้ createSyncAccessHandle ใน Dedicated Worker เพื่อเขียนไฟล์ขนาดใหญ่แทน
+    async function br2CreateOpfsWriter(fileName) {
+      if (typeof Worker === 'undefined' || typeof Blob === 'undefined' ||
+          !URL.createObjectURL || typeof WritableStream === 'undefined') {
+        throw new Error('เบราว์เซอร์นี้ไม่รองรับ Worker/OPFS สำหรับเขียนไฟล์เกม');
+      }
+      var workerSource = `
+        var access = null;
+        self.onmessage = async function(event) {
+          var m = event.data || {};
+          try {
+            if (m.type === 'init') {
+              // สร้าง/เปิดไฟล์ภายใน Worker เอง ห้ามส่ง FileSystemFileHandle ข้าม postMessage
+              // เพราะ Safari บางรุ่นไม่สามารถ structured-clone handle ได้ (DataCloneError)
+              if (!self.navigator.storage || !self.navigator.storage.getDirectory) {
+                throw new Error('Worker นี้ไม่รองรับ OPFS');
+              }
+              var root = await self.navigator.storage.getDirectory();
+              var handle = await root.getFileHandle(m.fileName, {create:true});
+              if (typeof handle.createSyncAccessHandle !== 'function') {
+                throw new Error('Safari ไม่รองรับ OPFS Sync Access Handle ใน Worker');
+              }
+              access = await handle.createSyncAccessHandle();
+              access.truncate(0);
+              self.postMessage({id:m.id, ok:true});
+            } else if (m.type === 'write') {
+              if (!access) throw new Error('OPFS writer ยังไม่พร้อม');
+              var bytes = new Uint8Array(m.buffer);
+              var done = 0;
+              while (done < bytes.length) {
+                var n = access.write(bytes.subarray(done), {at:m.offset + done});
+                if (!n || n < 0) throw new Error('เขียนข้อมูล OPFS ไม่สำเร็จ');
+                done += n;
+              }
+              self.postMessage({id:m.id, ok:true, written:done});
+            } else if (m.type === 'close') {
+              if (access) { access.flush(); access.close(); access = null; }
+              self.postMessage({id:m.id, ok:true});
+            } else if (m.type === 'abort') {
+              if (access) { access.close(); access = null; }
+              self.postMessage({id:m.id, ok:true});
+            }
+          } catch (error) {
+            self.postMessage({id:m.id, ok:false, error:error && error.message || String(error)});
+          }
+        };
+      `;
+      var workerUrl = URL.createObjectURL(new Blob([workerSource], {type:'text/javascript'}));
+      var worker = new Worker(workerUrl);
+      var requestId = 0, offset = 0, pending = Object.create(null), stopped = false;
+      function failAll(message) {
+        Object.keys(pending).forEach(function(k) { pending[k].reject(new Error(message)); delete pending[k]; });
+      }
+      worker.onmessage = function(event) {
+        var m = event.data || {}, task = pending[m.id];
+        if (!task) return;
+        delete pending[m.id];
+        if (m.ok) task.resolve(m); else task.reject(new Error(m.error || 'OPFS worker error'));
+      };
+      worker.onerror = function(event) { failAll(event.message || 'OPFS worker หยุดทำงาน'); };
+      function send(type, data, transfer) {
+        return new Promise(function(resolve, reject) {
+          var id = ++requestId; pending[id] = {resolve:resolve, reject:reject};
+          var message = Object.assign({type:type, id:id}, data || {});
+          try { worker.postMessage(message, transfer || []); }
+          catch (error) { delete pending[id]; reject(error); }
+        });
+      }
+      try {
+        await send('init', {fileName:fileName});
+      } catch (error) {
+        worker.terminate(); URL.revokeObjectURL(workerUrl);
+        throw new Error('เริ่มระบบเขียนไฟล์ OPFS บน iPhone ไม่สำเร็จ: ' + (error.message || error));
+      }
+      var stream = new WritableStream({
+        write: async function(chunk) {
+          var bytes = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+          var copy = bytes.slice();
+          await send('write', {buffer:copy.buffer, offset:offset}, [copy.buffer]);
+          offset += bytes.byteLength;
+        },
+        close: async function() {
+          if (stopped) return;
+          await send('close'); stopped = true;
+          worker.terminate(); URL.revokeObjectURL(workerUrl);
+        },
+        abort: async function() {
+          if (stopped) return;
+          try { await send('abort'); } catch (_) {}
+          stopped = true; worker.terminate(); URL.revokeObjectURL(workerUrl);
+        }
+      });
+      return {
+        stream: stream,
+        abort: async function() {
+          if (stopped) return;
+          try { await send('abort'); } catch (_) {}
+          stopped = true; worker.terminate(); URL.revokeObjectURL(workerUrl);
+        }
+      };
+    }
+
     async function br2LoadZipFromServer() {
       var btn = document.getElementById('load-server-game');
       try { sessionStorage.setItem('br2_v4_last_attempt', new Date().toISOString()); } catch(_) {} br2Mark('server-load-start','เริ่มดึง ZIP จาก Cloudflare R2');
@@ -4198,10 +4459,12 @@ void main()
           }
           br2Mark('member-stream-start', e.name + ' method=' + e.method + ' compressed=' + e.compSize + ' expanded=' + e.uncompSize);
           showStatus('เตรียมพื้นที่ชั่วคราวสำหรับ ' + e.name + '…');
-          var opfsRoot = await navigator.storage.getDirectory();
           var safeName = 'br2-' + e.name.replace(/[^a-z0-9._-]/gi, '_');
+          // Keep a main-thread handle only for reading the completed file after
+          // the Worker closes its SyncAccessHandle. Never pass this handle to Worker.
+          var opfsRoot = await navigator.storage.getDirectory();
           var opfsHandle = await opfsRoot.getFileHandle(safeName, {create:true});
-          var opfsWriter = await opfsHandle.createWritable({keepExistingData:false});
+          var opfsWriter = await br2CreateOpfsWriter(safeName);
           var nextOffset = dataStart;
           var chunkCount = 0;
           var source = new ReadableStream({
@@ -4246,7 +4509,7 @@ void main()
             } else {
               br2Mark('member-stored-start', e.name + ' ไม่ต้องคลายการบีบอัด');
             }
-            await outputStream.pipeThrough(outputCounter).pipeTo(opfsWriter);
+            await outputStream.pipeThrough(outputCounter).pipeTo(opfsWriter.stream);
           } catch (streamErr) {
             try { await opfsWriter.abort(); } catch (_) {}
             throw streamErr;
@@ -4348,11 +4611,41 @@ void main()
     document.getElementById('file-bios').addEventListener('change', async function(e){ var f=e.target.files[0]; e.target.value=''; if(!f) return; biosBlob=new Blob([await f.arrayBuffer()]); biosName=f.name; document.getElementById('bios-state').textContent=f.name+' ✓'; log('BIOS chargé : '+f.name,'ok'); });
 
     bar.addEventListener('click', async function(e){ var b=e.target.closest('button'); if(!b) return; var act=b.getAttribute('data-act');
+      if(['loadrom','disc','savestate','loadstate','togglelog'].indexOf(act)>=0) return;
       try{
-        if(act==='menu'){ document.getElementById('loader-close').style.display=ng?'':'none'; document.getElementById('resume-game').style.display=ng?'':'none'; loader.classList.remove('hidden'); updateHomeButtons(); }
+        if(act==='menu'){ var extra=document.getElementById('extra-menu'); extra.hidden=!extra.hidden; b.setAttribute('aria-expanded',String(!extra.hidden)); }
+        else if(act==='savecurrent'){ if(!ng||!romId){ log('ยังไม่มีเกมที่กำลังเล่นให้บันทึก','muted'); } else { var saved=await robustSaveState(); await idbSet('state:'+romId, saved&&saved.state?saved.state:saved); histSet(romId,{hasState:true,stateTs:Date.now()}); log('บันทึกจุดเล่นปัจจุบันแล้ว — กด “เล่นต่อ” เพื่อกลับมาจุดนี้','ok'); } }
+        else if(act==='resetgame'){
+          if(!ng){ log('ยังไม่มีเกมที่กำลังเล่นให้รีเซ็ท','muted'); }
+          else if(confirm('รีเซ็ทเกมกลับไปยังหน้าเริ่มต้นหรือไม่? ความคืบหน้าที่ยังไม่ได้กด “บันทึก” อาจสูญหาย')){
+            releaseAll();
+            ng.restart();
+            setTimeout(function(){ try{ fit(); canvas.focus(); }catch(_){ } },120);
+            log('รีเซ็ทเกมแล้ว กำลังเริ่มเกมใหม่จากหน้าเริ่มต้น','ok');
+          }
+        }
         else if(act==='loadrom'){ await clearMemAndReload(); }
-        else if(act==='fs'){ if(document.fullscreenElement){ await document.exitFullscreen(); } else if(stage.requestFullscreen){ await stage.requestFullscreen(); } else if(stage.webkitRequestFullscreen){ stage.webkitRequestFullscreen(); } }
+        else if(act==='fs'){
+          var fsBtn=b;
+          var nativeFs=!!(document.fullscreenElement||document.webkitFullscreenElement);
+          if(document.body.classList.contains('fullscreen-mode') || nativeFs){
+            document.body.classList.remove('fullscreen-mode');
+            fsBtn.textContent='เต็มหน้าจอ';
+            if(document.fullscreenElement && document.exitFullscreen){ document.exitFullscreen().catch(function(){}); }
+            else if(document.webkitFullscreenElement && document.webkitExitFullscreen){ document.webkitExitFullscreen(); }
+          }else{
+            // Apply the visual fullscreen layout synchronously on tap, even on browsers
+            // where the native Fullscreen API is delayed or unavailable.
+            document.body.classList.add('fullscreen-mode');
+            fsBtn.textContent='ออกเต็มจอ';
+            fit();
+            var req=stage.requestFullscreen||stage.webkitRequestFullscreen;
+            if(req){ try{ var promise=req.call(stage); if(promise&&promise.catch) promise.catch(function(){ /* CSS fullscreen fallback stays active */ }); }catch(_){ /* CSS fullscreen fallback stays active */ } }
+          }
+          requestAnimationFrame(fit);
+        }
         else if(act==='pad'){ pad.classList.toggle('show'); setTimeout(fit,30); }
+        else if(act==='editpad'){ openPadEditor(); }
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
         else if(act==='dot1'){ setDotMode(1); }
         else if(act==='dot2'){ setDotMode(2); }
