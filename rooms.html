@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090911">
+<title>BLOODY ROAR THAILAND | ONLINE</title>
+
+<style>
+:root {
+  --bg:#090911;
+  --panel:#191725;
+  --red:#e52b43;
+  --gold:#d9b45c;
+  --text:#f7f5f8;
+  --muted:#b9b3c2;
+  --green:#54d68b;
+}
+
+*{box-sizing:border-box}
+
+body {
+  margin:0;
+  min-height:100vh;
+  background:radial-gradient(ellipse at 80% 0%,#70182e55,transparent 40%),#090911;
+  color:var(--text);
+  font-family:system-ui,-apple-system,sans-serif;
+}
+
+.wrap {
+  width:min(600px,92%);
+  margin:auto;
+}
+
+header {
+  padding:25px 0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid #ffffff20;
+}
+
+.brand {
+  font-weight:1000;
+  font-size:17px;
+}
+
+.brand span {color:var(--red)}
+
+.back {
+  color:white;
+  text-decoration:none;
+  padding:10px 14px;
+  background:#ffffff12;
+  border-radius:9px;
+}
+
+.hero {
+  padding:35px 0 20px;
+  text-align:center;
+}
+
+.hero h1 {
+  font-size:34px;
+  margin:10px 0;
+  font-weight:1000;
+}
+
+.hero h1 span {color:var(--red)}
+
+.hero p {
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.8;
+}
+
+.panel {
+  margin-top:20px;
+  padding:22px;
+  background:linear-gradient(145deg,#211d2d,#141321);
+  border:1px solid #ffffff20;
+  border-radius:16px;
+}
+
+.panel h2 {
+  margin:0 0 8px;
+  font-size:21px;
+}
+
+.desc {
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.7;
+}
+
+label {
+  display:block;
+  margin-top:18px;
+  color:var(--gold);
+  font-size:13px;
+}
+
+input {
+  width:100%;
+  margin-top:8px;
+  padding:15px;
+  border-radius:10px;
+  border:1px solid #ffffff30;
+  background:#090911;
+  color:white;
+  font-size:17px;
+  outline:none;
+}
+
+input:focus {border-color:var(--gold)}
+
+button {
+  cursor:pointer;
+  font-family:inherit;
+}
+
+.btn {
+  width:100%;
+  padding:15px;
+  border:0;
+  border-radius:10px;
+  background:var(--red);
+  color:white;
+  font-weight:900;
+  font-size:15px;
+  margin-top:12px;
+}
+
+.btn.secondary {
+  background:#ffffff12;
+  border:1px solid #ffffff30;
+}
+
+.btn:disabled {
+  opacity:.5;
+  cursor:wait;
+}
+
+.codebox {
+  margin-top:18px;
+  padding:18px;
+  background:#090911;
+  border:1px solid var(--gold);
+  border-radius:12px;
+  text-align:center;
+}
+
+.code {
+  font-size:35px;
+  font-weight:1000;
+  letter-spacing:7px;
+  color:var(--gold);
+  overflow-wrap:anywhere;
+}
+
+.status {
+  margin-top:18px;
+  padding:15px;
+  background:#090911;
+  border:1px solid #ffffff20;
+  border-radius:10px;
+  font-size:13px;
+  line-height:1.9;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+
+.status.ok {border-color:#54d68b80}
+.status.error {border-color:#e52b4380}
+
+.players {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:18px;
+}
+
+.player {
+  padding:17px 8px;
+  background:#ffffff09;
+  border:1px solid #ffffff20;
+  border-radius:10px;
+  text-align:center;
+  font-size:13px;
+}
+
+.player strong {
+  display:block;
+  margin-top:7px;
+}
+
+.online {color:var(--green)}
+.waiting {color:var(--gold)}
+
+footer {
+  padding:35px 0;
+  text-align:center;
+  color:var(--muted);
+  font-size:11px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header class="wrap">
+  <div class="brand">BLOODY ROAR <span>THAILAND</span></div>
+  <a class="back" href="index.html">← กลับหน้าหลัก</a>
+</header>
+
+<main class="wrap">
+
+<section class="hero">
+  <div>🌐 ONLINE MULTIPLAYER</div>
+  <h1>BLOODY ROAR <span>ONLINE</span></h1>
+  <p>
+    ระบบห้องออนไลน์ส่วนตัว<br>
+    สร้างห้องและเชิญเพื่อนด้วยรหัส 6 ตัว
+  </p>
+</section>
+
+<section class="panel">
+
+<h2>👤 ข้อมูลผู้เล่น</h2>
+
+<label>ชื่อผู้เล่น</label>
+<input id="playerName" maxlength="20"
+placeholder="ใส่ชื่อผู้เล่น" value="Player 1">
+
+</section>
+
+<section class="panel">
+
+<h2>🥊 สร้างห้องใหม่</h2>
+
+<p class="desc">
+สร้างห้องส่วนตัวและรับรหัสสำหรับเชิญเพื่อน
+</p>
+
+<button class="btn" id="createBtn" onclick="createRoom()">
+＋ สร้างห้องใหม่
+</button>
+
+</section>
+
+<section class="panel">
+
+<h2>👥 เข้าร่วมห้อง</h2>
+
+<p class="desc">
+กรอกรหัส 6 ตัวที่เพื่อนส่งให้
+</p>
+
+<label>รหัสห้อง</label>
+<input id="roomCode" maxlength="6"
+placeholder="ABC123"
+autocapitalize="characters"
+autocomplete="off">
+
+<button class="btn" id="joinBtn" onclick="joinRoom()">
+เข้าร่วมห้อง
+</button>
+
+</section>
+
+<section class="panel">
+
+<h2>📡 สถานะห้องออนไลน์</h2>
+
+<div id="status" class="status">
+กำลังเตรียมระบบ...
+</div>
+
+<div class="codebox" id="codeBox" hidden>
+<div style="color:var(--muted);font-size:12px">
+รหัสห้องของคุณ
+</div>
+
+<div class="code" id="roomCodeDisplay">------</div>
+
+<button class="btn" onclick="copyCode()">
+คัดลอกรหัสห้อง
+</button>
+</div>
+
+<div class="players">
+
+<div class="player">
+👤 ผู้เล่น 1
+<strong id="player1" class="waiting">รอผู้เล่น</strong>
+</div>
+
+<div class="player">
+👤 ผู้เล่น 2
+<strong id="player2" class="waiting">รอผู้เล่น</strong>
+</div>
+
+</div>
+
+<button class="btn secondary" onclick="checkServer()">
+ตรวจสอบเซิร์ฟเวอร์
+</button>
+
+<button class="btn secondary" onclick="disconnectRoom()">
+ออกจากห้อง
+</button>
+
+</section>
+
+</main>
+
+<footer class="wrap">
+BLOODY ROAR THAILAND<br>
+ONLINE ROOM SYSTEM
+</footer>
+
+<script>
+
+const API =
+"https://br2-online-rooms.fukthefuk400.workers.dev";
+
+let socket = null;
+let activeRoomCode = "";
+let activePlayerId = "";
+let busy = false;
+
+const $ = id => document.getElementById(id);
+
+function status(message,type="") {
+  $("status").textContent = message;
+  $("status").className = "status " + type;
+}
+
+function setBusy(value) {
+  busy = value;
+  $("createBtn").disabled = value;
+  $("joinBtn").disabled = value;
+}
+
+function playerName() {
+  return ($("playerName").value.trim() || "Player").slice(0,20);
+}
+
+async function checkServer() {
+  status("กำลังตรวจสอบเซิร์ฟเวอร์...");
+
+  try {
+    const response = await fetch(API + "/health",{
+      cache:"no-store"
+    });
+
+    const data = await response.json();
+
+    if(!response.ok || !data.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    status(
+      "● เซิร์ฟเวอร์พร้อมใช้งาน\n" +
+      "บริการ: " + (data.service || "BR2 online rooms"),
+      "ok"
+    );
+
+  } catch(error) {
+    status("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์\n" + error.message,"error");
+  }
+}
+
+async function createRoom() {
+
+  if(busy) return;
+
+  setBusy(true);
+  closeSocket();
+
+  $("codeBox").hidden = true;
+  status("กำลังสร้างห้องออนไลน์...");
+
+  try {
+
+    const response = await fetch(API + "/create",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        name:playerName()
+      })
+    });
+
+    const data = await response.json();
+
+    if(!response.ok || !data.room) {
+      throw new Error(data.error || "ไม่สามารถสร้างห้องได้");
+    }
+
+    const room = data.room;
+    const player = room.players && room.players[0];
+
+    if(!room.code || !player || !player.id) {
+      throw new Error("ข้อมูลห้องไม่ครบ");
+    }
+
+    activeRoomCode = room.code;
+    activePlayerId = player.id;
+
+    $("roomCode").value = room.code;
+    $("roomCodeDisplay").textContent = room.code;
+    $("codeBox").hidden = false;
+
+    try {
+      localStorage.setItem(
+        "br2-player-" + room.code,
+        player.id
+      );
+    } catch(e) {}
+
+    connectRoom(room.code,player.id,"host");
+
+  } catch(error) {
+    status("สร้างห้องไม่สำเร็จ\n" + error.message,"error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function joinRoom() {
+
+  if(busy) return;
+
+  const code = $("roomCode").value.trim().toUpperCase();
+
+  if(!/^[A-Z0-9]{6}$/.test(code)) {
+    status("กรุณากรอกรหัสห้องให้ครบ 6 ตัว","error");
+    return;
+  }
+
+  setBusy(true);
+  closeSocket();
+
+  status("กำลังเข้าร่วมห้อง " + code + "...");
+
+  try {
+
+    const response = await fetch(
+      API + "/room/" + encodeURIComponent(code) + "/join",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          name:playerName()
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if(!response.ok || !data.playerId) {
+      throw new Error(data.error || "ไม่สามารถเข้าร่วมห้องได้");
+    }
+
+    activeRoomCode = code;
+    activePlayerId = data.playerId;
+
+    $("roomCodeDisplay").textContent = code;
+    $("codeBox").hidden = false;
+
+    try {
+      localStorage.setItem(
+        "br2-player-" + code,
+        data.playerId
+      );
+    } catch(e) {}
+
+    connectRoom(code,data.playerId,"guest");
+
+  } catch(error) {
+    status("เข้าร่วมห้องไม่สำเร็จ\n" + error.message,"error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function connectRoom(code,playerId,role) {
+
+  closeSocket();
+
+  const wsURL =
+    API.replace(/^https:/,"wss:") +
+    "/room/" + encodeURIComponent(code) + "/ws";
+
+  const ws = new WebSocket(wsURL);
+
+  socket = ws;
+
+  status("กำลังเชื่อมต่อ WebSocket...");
+
+  ws.onopen = () => {
+
+    if(socket !== ws) return;
+
+    status(
+      "เชื่อมต่อห้องสำเร็จ\n" +
+      "รหัสห้อง: " + code + "\n" +
+      "บทบาท: " + (role === "host" ? "เจ้าของห้อง" : "ผู้เข้าร่วม") +
+      "\nรอข้อมูลผู้เล่น...",
+      "ok"
+    );
+  };
+
+  ws.onmessage = event => {
+
+    if(socket !== ws) return;
+
+    try {
+
+      const data = JSON.parse(event.data);
+
+      if(data.type === "state" && data.room) {
+
+        const room = data.room;
+        const players = room.players || [];
+
+        $("player1").textContent =
+          players[0] ? players[0].name : "รอผู้เล่น";
+
+        $("player2").textContent =
+          players[1] ? players[1].name : "รอผู้เล่น";
+
+        $("player1").className =
+          players[0] ? "online" : "waiting";
+
+        $("player2").className =
+          players[1] ? "online" : "waiting";
+
+        status(
+          "● เชื่อมต่อห้องแล้ว\n" +
+          "รหัสห้อง: " + room.code + "\n" +
+          "สถานะ: " + room.status + "\n" +
+          "ผู้เล่น: " + players.length + "/2 คน\n" +
+          (room.status === "ready"
+            ? "ผู้เล่นครบแล้ว พร้อมทดสอบระบบต่อไป"
+            : "กำลังรอผู้เล่นอีกคน"),
+          "ok"
+        );
+
+      } else if(data.type === "error") {
+
+        status("Worker แจ้งข้อผิดพลาด\n" + data.message,"error");
+
+      }
+
+    } catch(error) {
+      status("ได้รับข้อมูลจากห้อง แต่ไม่สามารถอ่านข้อมูลได้","error");
+    }
+  };
+
+  ws.onerror = () => {
+
+    if(socket !== ws) return;
+
+    status(
+      "เชื่อมต่อห้องแล้ว แต่ WebSocket เกิดข้อผิดพลาด",
+      "error"
+    );
+  };
+
+  ws.onclose = () => {
+
+    if(socket !== ws) return;
+
+    status("การเชื่อมต่อห้องสิ้นสุดแล้ว");
+    socket = null;
+  };
+}
+
+async function copyCode() {
+
+  if(!activeRoomCode) return;
+
+  try {
+
+    await navigator.clipboard.writeText(activeRoomCode);
+
+    status("คัดลอกรหัสห้อง " + activeRoomCode + " แล้ว","ok");
+
+  } catch(error) {
+
+    $("roomCode").value = activeRoomCode;
+    $("roomCode").focus();
+    $("roomCode").select();
+
+    status("เลือกรหัสห้องแล้ว กรุณากดคัดลอก");
+  }
+}
+
+function closeSocket() {
+
+  if(socket) {
+    const oldSocket = socket;
+    socket = null;
+    oldSocket.close();
+  }
+}
+
+function disconnectRoom() {
+
+  closeSocket();
+
+  activeRoomCode = "";
+  activePlayerId = "";
+
+  $("codeBox").hidden = true;
+
+  $("player1").textContent = "รอผู้เล่น";
+  $("player2").textContent = "รอผู้เล่น";
+
+  $("player1").className = "waiting";
+  $("player2").className = "waiting";
+
+  status("ออกจากการเชื่อมต่อห้องแล้ว");
+}
+
+window.addEventListener("load",checkServer);
+
+window.addEventListener("beforeunload",closeSocket);
+
+</script>
+
+</body>
+</html>
