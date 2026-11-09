@@ -253,7 +253,7 @@ let activeDirection=null;
 let lastSend=0;
 
 const SPEED=32;
-const SEND_RATE=100;
+const SEND_RATE=60;
 
 function log(s){
 
@@ -539,7 +539,7 @@ function movementLoop(time){
 
  if(!current||!target)return;
 
- const smooth=1-Math.exp(-12*dt);
+ const smooth=1-Math.exp(-20*dt);
 
  current.x+=(target.x-current.x)*smooth;
  current.y+=(target.y-current.y)*smooth;
