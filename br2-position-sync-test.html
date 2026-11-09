@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10131a">
-<title>BR2 Network Movement V5</title>
+<title>BR2 Network Movement V6</title>
 
 <style>
 *{box-sizing:border-box}
@@ -136,11 +136,11 @@ button.secondary{background:#394354}
 <body>
 <main>
 
-<h1>BR2 Network Movement V5</h1>
+<h1>BR2 Network Movement V6</h1>
 
 <p>
 ระบบ Multiplayer พร้อม Low Latency,
-Fast Position Sync และ Smooth Interpolation
+Fast Position Sync และ Predictive Interpolation
 </p>
 
 <label>รหัสห้อง</label>
@@ -245,6 +245,11 @@ const SPEED=32;
 const SEND_RATE=30;
 const INTERPOLATION_DELAY=40;
 const MAX_SNAPSHOTS=30;
+
+// V6 Predictive Interpolation
+
+const MAX_EXTRAPOLATION=25;
+const MAX_REMOTE_SPEED=65;
 
 function log(s){
 
@@ -366,7 +371,48 @@ function receivePosition(d){
 
 }
 
-// คำนวณตำแหน่งระหว่างข้อมูลสองจุด
+// V6: คำนวณความเร็วจาก Snapshot สองชุดล่าสุด
+
+function getRemoteVelocity(buffer){
+
+ if(!buffer||buffer.length<2){
+
+  return {vx:0,vy:0};
+
+ }
+
+ const a=buffer[buffer.length-2];
+ const b=buffer[buffer.length-1];
+
+ const elapsed=(b.time-a.time)/1000;
+
+ if(elapsed<=0){
+
+  return {vx:0,vy:0};
+
+ }
+
+ let vx=(b.x-a.x)/elapsed;
+ let vy=(b.y-a.y)/elapsed;
+
+ const speed=Math.sqrt(vx*vx+vy*vy);
+
+ // ป้องกันความเร็วผิดปกติ
+
+ if(speed>MAX_REMOTE_SPEED){
+
+  const ratio=MAX_REMOTE_SPEED/speed;
+
+  vx*=ratio;
+  vy*=ratio;
+
+ }
+
+ return {vx,vy};
+
+}
+
+// V6: Interpolation พร้อมการคาดการณ์ระยะสั้น
 
 function interpolatePosition(id,renderTime){
 
@@ -378,7 +424,9 @@ function interpolatePosition(id,renderTime){
   buffer.length>2&&
   buffer[1].time<renderTime
  ){
+
   buffer.shift();
+
  }
 
  if(buffer.length===1){
@@ -423,6 +471,8 @@ function interpolatePosition(id,renderTime){
 
  }
 
+ // ถ้าเวลาแสดงผลก่อน Snapshot แรก
+
  if(renderTime<buffer[0].time){
 
   return {
@@ -433,6 +483,40 @@ function interpolatePosition(id,renderTime){
  }
 
  const last=buffer[buffer.length-1];
+
+ // V6: คาดการณ์เฉพาะเมื่อผู้เล่นยังเคลื่อนที่
+
+ if(directions[id]&&directions[id]!=="stop"){
+
+  const velocity=getRemoteVelocity(buffer);
+
+  const extraTime=clamp(
+   renderTime-last.time,
+   0,
+   MAX_EXTRAPOLATION
+  );
+
+  const seconds=extraTime/1000;
+
+  return {
+
+   x:clamp(
+    last.x+velocity.vx*seconds,
+    3,
+    97
+   ),
+
+   y:clamp(
+    last.y+velocity.vy*seconds,
+    7,
+    93
+   )
+
+  };
+
+ }
+
+ // ถ้าหยุดแล้ว ให้ใช้ตำแหน่งล่าสุด
 
  return {
   x:last.x,
@@ -638,8 +722,6 @@ function startMove(dir){
 
  const now=performance.now();
 
- // อัปเดตระยะทางของทิศเดิมก่อนเปลี่ยนทิศ
-
  advanceLocalMovement(now);
 
  if(activeDirection===dir)return;
@@ -654,8 +736,6 @@ function startMove(dir){
   b.classList.toggle("active",b.dataset.move===dir);
  });
 
- // ส่งตำแหน่งและทิศทางใหม่ทันที
-
  sendPosition();
 
 }
@@ -663,8 +743,6 @@ function startMove(dir){
 function stopMove(){
 
  if(!activeDirection)return;
-
- // คำนวณระยะทางสุดท้ายก่อนหยุด
 
  advanceLocalMovement(performance.now());
 
@@ -678,8 +756,6 @@ function stopMove(){
 
   directions[myId]="stop";
 
-  // ส่งตำแหน่งสุดท้ายพร้อมคำสั่งหยุดทันที
-
   sendPosition();
 
  }
@@ -689,9 +765,6 @@ function stopMove(){
 function movementLoop(time){
 
  requestAnimationFrame(movementLoop);
-
- const dt=lastFrame?
- Math.min((time-lastFrame)/1000,0.05):0;
 
  lastFrame=time;
 
@@ -720,8 +793,11 @@ function movementLoop(time){
   if(p){
 
    positions[id]={
+
     x:clamp(p.x,3,97),
+
     y:clamp(p.y,7,93)
+
    };
 
   }
