@@ -608,11 +608,14 @@ function connectRoom(code,playerId,role) {
 
   closeSocket();
 
-  const wsURL =
-    API.replace(/^https:/,"wss:") +
-    "/room/" + encodeURIComponent(code) + "/ws";
+  const wsURL = new URL(
+  API.replace(/^https:/,"wss:") +
+  "/room/" + encodeURIComponent(code) + "/ws"
+);
 
-  const ws = new WebSocket(wsURL);
+wsURL.searchParams.set("playerId", playerId);
+
+const ws = new WebSocket(wsURL.toString());
 
   socket = ws;
 
