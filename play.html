@@ -3511,7 +3511,23 @@ try {
 });
 </script>
 
-  <script>
+    <style>
+    #br2-room-panel{position:fixed;z-index:99999;top:calc(env(safe-area-inset-top,0px) + 8px);left:10px;width:min(310px,calc(100vw - 20px));padding:10px;background:rgba(15,19,28,.94);border:1px solid #64748b;border-radius:13px;color:#fff;font:13px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 5px 24px #0008;backdrop-filter:blur(12px)}
+    #br2-room-panel summary{font-weight:800;cursor:pointer;font-size:14px;padding:3px}#br2-room-panel input{width:100%;min-width:0;margin-top:7px;padding:9px;border:1px solid #64748b;border-radius:8px;background:#202631;color:white;font-size:15px}
+    #br2-room-panel .br2-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}#br2-room-panel button{border:0;border-radius:8px;padding:9px;background:#2878f0;color:#fff;font-weight:700;font-size:13px}#br2-room-panel button:last-child{background:#475569}#br2-room-status{margin-top:8px;color:#86efac;line-height:1.4;overflow-wrap:anywhere}
+    body.running #br2-room-panel{opacity:.88}body.running #br2-room-panel:focus-within{opacity:1}
+  </style>
+  <div id="br2-room-panel">
+    <details>
+      <summary>🌐 เล่นออนไลน์ 1v1</summary>
+      <input id="br2-room-name" maxlength="20" placeholder="ชื่อผู้เล่น" value="ผู้เล่น">
+      <input id="br2-room-code" maxlength="6" placeholder="รหัสห้อง 6 ตัว" autocapitalize="characters">
+      <div class="br2-actions"><button type="button" id="br2-create">สร้างห้อง</button><button type="button" id="br2-join">เข้าร่วมห้อง</button></div>
+      <div class="br2-actions"><button type="button" id="br2-leave">ออกจากห้อง</button><button type="button" id="br2-hide">ปิดเมนู</button></div>
+      <div id="br2-room-status">ยังไม่ได้เชื่อมต่อ · เล่นคนเดียวได้ตามปกติ</div>
+    </details>
+  </div>
+<script>
   (function(){
     "use strict";
     var ASPECT=4/3;
@@ -3521,7 +3537,14 @@ try {
       input_player1_start:'enter',input_player1_select:'rshift',
       input_player1_analog_dpad_mode:0,
       input_player1_l_x_minus:'j',input_player1_l_x_plus:'l',input_player1_l_y_minus:'i',input_player1_l_y_plus:'k',
-      input_player1_r_x_minus:'f',input_player1_r_x_plus:'h',input_player1_r_y_minus:'t',input_player1_r_y_plus:'g' };
+      input_player1_r_x_minus:'f',input_player1_r_x_plus:'h',input_player1_r_y_minus:'t',input_player1_r_y_plus:'g',
+      // Player 2 uses a separate keyboard map so remote inputs never overwrite Player 1.
+      input_player2_up:'8',input_player2_down:'5',input_player2_left:'4',input_player2_right:'6',
+      input_player2_b:'c',input_player2_a:'v',input_player2_y:'b',input_player2_x:'n',
+      input_player2_l:'7',input_player2_r:'9',input_player2_l2:'0',input_player2_r2:'minus',
+      input_player2_start:'kp_enter',input_player2_select:'kp_plus',
+      input_player2_l_x_minus:'home',input_player2_l_x_plus:'end',input_player2_l_y_minus:'pageup',input_player2_l_y_plus:'pagedown',
+      input_player2_r_x_minus:'insert',input_player2_r_x_plus:'delete',input_player2_r_y_minus:'backspace',input_player2_r_y_plus:'tab' };
     var DISC_EXT=['chd','pbp','cue','bin','iso','img','m3u','mdf'];
 
     var stage=document.getElementById('stage'), canvas=document.getElementById('screen'),
@@ -3530,6 +3553,77 @@ try {
         logEl=document.getElementById('log')||mklog();
     function mklog(){ var d=document.createElement('div'); d.id='log'; document.body.appendChild(d); return d; }
     var ng=null, curName='disc', curExt='chd', curFile=null, romId='disc', held={}, busy=false;
+    // BR2 online room bridge: local player keeps their assigned pad; remote player uses the other pad.
+    var BR2_ROOM_API='https://br2-online-rooms.fukthefuk400.workers.dev';
+    var br2Ws=null, br2RoomCode='', br2PlayerId='', br2Role='', br2RemoteHeld={};
+    function br2LocalPad(){ return br2Role==='guest'?2:1; }
+    function br2RemotePad(){ return br2Role==='guest'?1:2; }
+    function br2SendInput(button,action){
+      if(!br2Ws || br2Ws.readyState!==WebSocket.OPEN || !br2PlayerId) return;
+      try{ br2Ws.send(JSON.stringify({type:'input',playerId:br2PlayerId,button:button,action:action})); }catch(_){ }
+    }
+    function br2PadDown(button){ try{ if(ng) ng.pressDown(button,br2LocalPad()); }catch(_){ }
+      br2SendInput(button,'down'); }
+    function br2PadUp(button){ try{ if(ng) ng.pressUp(button,br2LocalPad()); }catch(_){ }
+      br2SendInput(button,'up'); }
+    function br2RemoteReleaseAll(){
+      Object.keys(br2RemoteHeld).forEach(function(button){ try{ if(ng) ng.pressUp(button,br2RemotePad()); }catch(_){ } });
+      br2RemoteHeld={};
+    }
+    function br2ConnectSocket(code,playerId,role){
+      if(br2Ws){ try{br2Ws.close();}catch(_){ } }
+      br2RoomCode=code; br2PlayerId=playerId; br2Role=role; br2RemoteReleaseAll();
+      var ws=new WebSocket(BR2_ROOM_API.replace(/^https:/,'wss:')+'/room/'+code+'/ws'); br2Ws=ws;
+      ws.onopen=function(){ br2RoomUiStatus('เชื่อมต่อห้อง '+code+' แล้ว · '+(role==='host'?'ผู้เล่น 1':'ผู้เล่น 2')); };
+      ws.onmessage=function(event){
+        try{ var data=JSON.parse(event.data);
+          if(data.type==='state' && data.room){ br2RoomUiStatus('ห้อง '+data.room.code+' · '+data.room.status+' · '+(data.room.players||[]).length+'/2 คน'); return; }
+          if(data.type==='input' && data.playerId!==br2PlayerId){
+            var button=String(data.button||'');
+            if(data.action==='down'){
+              br2RemoteHeld[button]=true;
+              try{ if(ng) ng.pressDown(button,br2RemotePad()); }catch(_){ }
+            }else if(data.action==='up'){
+              delete br2RemoteHeld[button];
+              try{ if(ng) ng.pressUp(button,br2RemotePad()); }catch(_){ }
+            }
+            br2RoomUiStatus('รับคำสั่งจากอีกเครื่อง: '+button+' / '+data.action);
+          }
+        }catch(_){ }
+      };
+      ws.onclose=function(){ br2RemoteReleaseAll(); if(br2Ws===ws){br2Ws=null;br2RoomUiStatus('ห้องตัดการเชื่อมต่อแล้ว');} };
+      ws.onerror=function(){ br2RoomUiStatus('เชื่อมต่อห้องไม่สำเร็จ'); };
+    }
+    function br2RoomUiStatus(message){ var el=document.getElementById('br2-room-status'); if(el)el.textContent=message; }
+    async function br2CreateRoom(){
+      var name=(document.getElementById('br2-room-name').value||'ผู้เล่น 1').trim().slice(0,20)||'ผู้เล่น 1';
+      br2RoomUiStatus('กำลังสร้างห้อง...');
+      try{ var response=await fetch(BR2_ROOM_API+'/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+        var data=await response.json(); if(!response.ok||!data.room)throw new Error(data.error||'สร้างห้องไม่สำเร็จ');
+        var room=data.room, player=room.players&&room.players[0]; if(!player)throw new Error('ไม่พบข้อมูลผู้เล่นเจ้าของห้อง');
+        document.getElementById('br2-room-code').value=room.code;
+        try{localStorage.setItem('br2-player-'+room.code,player.id);}catch(_){ }
+        br2ConnectSocket(room.code,player.id,'host');
+      }catch(err){br2RoomUiStatus('ผิดพลาด: '+(err.message||err));}
+    }
+    async function br2JoinRoom(){
+      var code=(document.getElementById('br2-room-code').value||'').trim().toUpperCase();
+      var name=(document.getElementById('br2-room-name').value||'ผู้เล่น 2').trim().slice(0,20)||'ผู้เล่น 2';
+      if(!/^[A-Z0-9]{6}$/.test(code)){br2RoomUiStatus('กรุณาใส่รหัสห้อง 6 ตัว');return;}
+      br2RoomUiStatus('กำลังเข้าร่วมห้อง...');
+      try{ var response=await fetch(BR2_ROOM_API+'/room/'+code+'/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+        var data=await response.json(); if(!response.ok||!data.playerId)throw new Error(data.error||'เข้าห้องไม่สำเร็จ');
+        try{localStorage.setItem('br2-player-'+code,data.playerId);}catch(_){ }
+        br2ConnectSocket(code,data.playerId,'guest');
+      }catch(err){br2RoomUiStatus('ผิดพลาด: '+(err.message||err));}
+    }
+    function br2LeaveRoom(){
+      var code=br2RoomCode, id=br2PlayerId; br2RemoteReleaseAll();
+      if(br2Ws){try{br2Ws.close(1000,'leave');}catch(_){ }br2Ws=null;}
+      br2RoomCode='';br2PlayerId='';br2Role='';
+      if(code&&id)fetch(BR2_ROOM_API+'/room/'+code+'/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:id})}).catch(function(){});
+      br2RoomUiStatus('ออกจากห้องแล้ว · เล่นคนเดียวได้ตามปกติ');
+    }
     var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
     var CONTENT_DIR='/home/web_user/retroarch/userdata/content';
     var CFG_PATH='/home/web_user/retroarch/userdata/retroarch.cfg';
@@ -3887,7 +3981,7 @@ void main()
     var dpadEl=null, dpadPointer=null, dpadDirs={up:false,down:false,left:false,right:false};
     var stickCtl={};
     function makeStick(el,pfx){ if(!el) return null; var knob=el.querySelector('.knob'); var pid=null, act={};
-      function set(name,on){ var k=pfx+'_'+name; if(act[k]===on) return; act[k]=on; try{ if(ng){ on?ng.pressDown(k):ng.pressUp(k); } }catch(_){ } }
+      function set(name,on){ var k=pfx+'_'+name; if(act[k]===on) return; act[k]=on; try{ if(ng){ on?br2PadDown(k):br2PadUp(k); } }catch(_){ } }
       function upd(e){ var r=el.getBoundingClientRect(); var nx=(e.clientX-(r.left+r.width/2))/(r.width/2), ny=(e.clientY-(r.top+r.height/2))/(r.height/2); var m=Math.hypot(nx,ny); if(m>1){nx/=m;ny/=m;}
         knob.style.left=(50+nx*32)+'%'; knob.style.top=(50+ny*32)+'%'; var dz=0.34;
         set('x_minus',nx<-dz); set('x_plus',nx>dz); set('y_minus',ny<-dz); set('y_plus',ny>dz); }
@@ -3898,7 +3992,7 @@ void main()
       el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); el.addEventListener('lostpointercapture',end);
       return {reset:reset};
     }
-    function pressDir(dir,on){ if(dpadDirs[dir]===on) return; dpadDirs[dir]=on; try{ if(ng){ on?ng.pressDown(dir):ng.pressUp(dir); } }catch(_){ } if(dpadEl){ var a=dpadEl.querySelector('.ar.'+dir[0]); if(a) a.classList.toggle('on',on); } }
+    function pressDir(dir,on){ if(dpadDirs[dir]===on) return; dpadDirs[dir]=on; try{ if(ng){ on?br2PadDown(dir):br2PadUp(dir); } }catch(_){ } if(dpadEl){ var a=dpadEl.querySelector('.ar.'+dir[0]); if(a) a.classList.toggle('on',on); } }
     function updateDpad(e){ if(!dpadEl) return; var r=dpadEl.getBoundingClientRect(); var nx=(e.clientX-r.left)/r.width*2-1, ny=(e.clientY-r.top)/r.height*2-1; var dead=(Math.abs(nx)<0.28&&Math.abs(ny)<0.28); pressDir('left',!dead&&nx<-0.30); pressDir('right',!dead&&nx>0.30); pressDir('up',!dead&&ny<-0.30); pressDir('down',!dead&&ny>0.30); }
     function clearDpad(){ pressDir('up',false); pressDir('down',false); pressDir('left',false); pressDir('right',false); dpadPointer=null; }
     function buildPad(){
@@ -3914,8 +4008,8 @@ void main()
       var dend=function(e){ if(e.pointerId!==dpadPointer) return; clearDpad(); };
       dpadEl.addEventListener('pointerup',dend); dpadEl.addEventListener('pointercancel',dend); dpadEl.addEventListener('lostpointercapture',dend);
       Array.prototype.forEach.call(pad.querySelectorAll('button[data-btn]'), function(el){ var name=el.getAttribute('data-btn');
-        el.addEventListener('pointerdown',function(e){ e.preventDefault(); try{el.setPointerCapture(e.pointerId);}catch(_){ } el.classList.add('on'); held[name]=el; try{ if(ng) ng.pressDown(name); }catch(_){ } });
-        var rel=function(){ el.classList.remove('on'); delete held[name]; try{ if(ng) ng.pressUp(name); }catch(_){ } };
+        el.addEventListener('pointerdown',function(e){ e.preventDefault(); try{el.setPointerCapture(e.pointerId);}catch(_){ } el.classList.add('on'); held[name]=el; try{ br2PadDown(name); }catch(_){ } });
+        var rel=function(){ el.classList.remove('on'); delete held[name]; try{ br2PadUp(name); }catch(_){ } };
         el.addEventListener('pointerup',rel); el.addEventListener('pointercancel',rel); el.addEventListener('lostpointercapture',rel);
       });
       stickCtl.l=makeStick(document.getElementById('stickL'),'l'); stickCtl.r=makeStick(document.getElementById('stickR'),'r');
@@ -4024,7 +4118,7 @@ void main()
     }
     installEditorPanelDrag();
     loadPadLayout();installPadDrag();
-    function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng)ng.pressUp(n); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
+    function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ br2PadUp(n); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
     window.addEventListener('blur',releaseAll); document.addEventListener('visibilitychange',function(){ if(document.hidden) releaseAll(); });
 
     var fitT=null;
@@ -4695,7 +4789,18 @@ void main()
         }
       }).catch(function(){});
     }
+    // Bind the online-room panel from inside the emulator app scope.
+    var br2CreateBtn=document.getElementById('br2-create'), br2JoinBtn=document.getElementById('br2-join');
+    var br2LeaveBtn=document.getElementById('br2-leave'), br2HideBtn=document.getElementById('br2-hide');
+    if(br2CreateBtn) br2CreateBtn.addEventListener('click',br2CreateRoom);
+    if(br2JoinBtn) br2JoinBtn.addEventListener('click',br2JoinRoom);
+    if(br2LeaveBtn) br2LeaveBtn.addEventListener('click',br2LeaveRoom);
+    if(br2HideBtn) br2HideBtn.addEventListener('click',function(){var d=document.querySelector('#br2-room-panel details');if(d)d.open=false;});
+    window.addEventListener('beforeunload',function(){br2RemoteReleaseAll();if(br2Ws)try{br2Ws.close();}catch(_){ }});
   })();
   </script>
+
+
+
 </body>
 </html>
