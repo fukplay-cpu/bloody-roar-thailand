@@ -1,4 +1,5 @@
 <!doctype html>
+
 <html lang="th">
 <head>
 <meta charset="utf-8">
@@ -19,29 +20,49 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 .hero{min-height:510px;display:flex;align-items:center;padding:48px 0 62px;position:relative;overflow:hidden}
 .hero:after{content:"อสูร";position:absolute;right:-8px;bottom:-18px;font-size:clamp(120px,28vw,260px);font-weight:1000;letter-spacing:-12px;color:#fff;opacity:.035;pointer-events:none}
 .eyebrow{color:var(--gold);font-size:12px;font-weight:850;letter-spacing:1.4px}
-h1{font-size:clamp(42px,10vw,88px);line-height:.98;letter-spacing:-2.5px;margin:18px 0 18px;font-weight:1000}
+h1{font-size:clamp(42px,10vw,88px);line-height:.98;letter-spacing:-2.5px;margin:18px 0;font-weight:1000}
 h1 span{display:block;color:var(--red)}
 .intro{max-width:650px;color:#d4ced9;font-size:15px;line-height:1.9;margin:0}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:14px 22px;border-radius:10px;text-decoration:none;font-weight:900;font-size:15px;border:1px solid transparent;cursor:pointer}
 .primary{background:var(--red);color:#fff;box-shadow:0 10px 32px #e52b4338}
 .secondary{background:#ffffff0d;border-color:#ffffff30;color:#fff}
-.primary:active,.secondary:active{transform:translateY(1px)}
 .status{margin:10px 0 26px;padding:15px 17px;border:1px solid #d9b45c66;background:#d9b45c12;color:#f0dfb6;border-radius:12px;font-size:13px;line-height:1.8}
 .status strong{color:#f4d27d}
 .section-title{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:34px 0 15px}
-.section-title h2{font-size:23px;margin:0}.section-title small{color:var(--muted);font-size:11px}
+.section-title h2{font-size:23px;margin:0}
+.section-title small{color:var(--muted);font-size:11px}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .card{background:linear-gradient(145deg,var(--panel2),var(--panel));border:1px solid #ffffff18;border-radius:14px;padding:18px;min-height:150px;position:relative}
-.card .icon{font-size:27px}.card h3{font-size:16px;margin:10px 0 6px}.card p{font-size:12px;color:var(--muted);line-height:1.75;margin:0}
+.card .icon{font-size:27px}
+.card h3{font-size:16px;margin:10px 0 6px}
+.card p{font-size:12px;color:var(--muted);line-height:1.75;margin:0}
 .badge{position:absolute;right:12px;top:12px;padding:5px 8px;border:1px solid #d9b45c66;border-radius:30px;color:#e8ca80;font-size:10px}
+.card-action{width:100%;margin-top:14px;padding:11px;border:1px solid #e52b4380;border-radius:9px;background:#e52b4318;color:white;font-weight:800;font-size:13px}
+.card-action:active{background:#e52b4355}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:15px 0 42px}
 .step{padding:16px;border-radius:11px;background:#ffffff09;border-top:2px solid var(--red)}
-.step b{display:block;margin-bottom:6px}.step span{font-size:12px;line-height:1.7;color:var(--muted)}
+.step b{display:block;margin-bottom:6px}
+.step span{font-size:12px;line-height:1.7;color:var(--muted)}
 footer{border-top:1px solid #ffffff1b;padding:22px 0 36px;color:var(--muted);font-size:11px;line-height:1.9}
+
+/* Multiplayer dialog */
+.modal{display:none;position:fixed;inset:0;z-index:9999;background:#000d;padding:18px;align-items:center;justify-content:center}
+.modal.open{display:flex}
+.dialog{width:min(480px,100%);max-height:90dvh;overflow:auto;background:#191725;border:1px solid #d9b45c66;border-radius:18px;padding:22px;box-shadow:0 20px 80px #000}
+.dialog h2{margin:5px 0 8px;font-size:23px}
+.dialog p{color:var(–muted);font-size:13px;line-height:1.7}
+.close{float:right;background:#ffffff12;border:0;color:white;border-radius:9px;width:36px;height:36px;font-size:22px}
+.field{display:block;margin-top:15px;color:#e8ca80;font-size:13px}
+.field input{display:block;width:100%;margin-top:7px;padding:14px;border-radius:10px;border:1px solid #ffffff30;background:#090911;color:white;font-size:17px;outline:none}
+.field input:focus{border-color:var(–gold)}
+.dialog-buttons{display:grid;gap:10px;margin-top:18px}
+.dialog-buttons button{width:100%;padding:14px;border:0;border-radius:10px;background:var(–red);color:white;font-size:15px;font-weight:900}
+.dialog-buttons button.secondary-action{background:#ffffff12;border:1px solid #ffffff30}
+#room-result{margin-top:16px;padding:13px;background:#090911;border:1px solid #ffffff20;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.8;color:#f0dfb6;min-height:48px}
+.room-code{font-size:28px;letter-spacing:5px;font-weight:1000;color:#f4d27d;text-align:center;padding:12px}
 @media(min-width:720px){.grid{grid-template-columns:repeat(3,1fr)}.hero{min-height:590px}.intro{font-size:17px}}
 @media(max-width:430px){.hero{min-height:470px}.grid{gap:9px}.card{padding:14px;min-height:150px}.badge{font-size:9px}.steps{grid-template-columns:1fr}}
-</style>
 </head>
 <body>
 <header class="wrap">
@@ -51,7 +72,6 @@ footer{border-top:1px solid #ffffff1b;padding:22px 0 36px;color:var(--muted);fon
   </div>
   <div class="edition">เล่นผ่านเว็บ<br>iPhone · Android</div>
 </header>
-
 <main>
 <section class="wrap hero">
   <div>
@@ -64,26 +84,26 @@ footer{border-top:1px solid #ffffff1b;padding:22px 0 36px;color:var(--muted);fon
     </div>
   </div>
 </section>
-
 <section class="wrap">
-  <div class="status"><strong>สถานะระบบ: พร้อมทดสอบเล่นบนมือถือ</strong><br>ระบบโหลดเกมจากเซิร์ฟเวอร์และเปิดเข้า Emulator ผ่านการทดสอบบน iPhone แล้ว ความเร็วในการโหลดขึ้นอยู่กับเครือข่ายและหน่วยความจำของอุปกรณ์</div>
-
+  <div class="status"><strong>สถานะระบบ: พร้อมทดสอบระบบห้องออนไลน์</strong><br>ระบบห้องเชื่อมต่อกับ Worker สำหรับสร้างห้องและเข้าร่วมห้อง ส่วนระบบส่งคำสั่งต่อสู้ระหว่างเกมจะพัฒนาในขั้นต่อไป</div>
   <div class="section-title"><h2>โหมดการเล่น</h2><small>เลือกประสบการณ์ของคุณ</small></div>
   <div class="grid">
     <article class="card">
       <span class="badge">พร้อมใช้งาน</span><div class="icon">🥊</div>
       <h3>เล่นคนเดียว</h3><p>โหลด Bloody Roar 2 จากเซิร์ฟเวอร์ แล้วเข้าเล่นผ่าน Emulator บนมือถือ</p>
+      <a class="btn primary" style="margin-top:12px;width:100%" href="play.html">เริ่มเล่น</a>
     </article>
-    <article class="card">
-      <span class="badge">กำลังพัฒนา</span><div class="icon">🌐</div>
-      <h3>ต่อสู้ออนไลน์</h3><p>ระบบแข่งขันแบบตัวต่อตัวยังอยู่ระหว่างการพัฒนา ยังไม่เปิดให้ใช้งาน</p>
-    </article>
-    <article class="card">
-      <span class="badge">กำลังพัฒนา</span><div class="icon">👥</div>
-      <h3>สร้างห้อง / เข้าร่วมห้อง</h3><p>ระบบห้องส่วนตัวและเชิญเพื่อนจะเปิดให้ใช้ในขั้นตอนถัดไป</p>
-    </article>
+<article class="card">
+  <span class="badge">ทดสอบระบบห้อง</span><div class="icon">🌐</div>
+  <h3>ต่อสู้ออนไลน์</h3><p>เปิดเมนูออนไลน์เพื่อสร้างห้องหรือเข้าร่วมห้องกับเพื่อน</p>
+  <button class="card-action" onclick="openRooms()">เปิดระบบออนไลน์</button>
+</article>
+<article class="card">
+  <span class="badge">ทดสอบระบบห้อง</span><div class="icon">👥</div>
+  <h3>สร้างห้อง / เข้าร่วมห้อง</h3><p>สร้างรหัสห้องส่วนตัว 6 ตัว หรือกรอกรหัสเพื่อเข้าร่วม</p>
+  <button class="card-action" onclick="openRooms()">สร้างห้อง / เข้าร่วม</button>
+</article>
   </div>
-
   <div class="section-title" id="howto"><h2>วิธีเข้าเล่น</h2><small>เพียงไม่กี่ขั้นตอน</small></div>
   <div class="steps">
     <div class="step"><b>01 · เปิดเกม</b><span>แตะปุ่ม “เริ่มเล่น Bloody Roar 2”</span></div>
@@ -92,9 +112,177 @@ footer{border-top:1px solid #ffffff1b;padding:22px 0 36px;color:var(--muted);fon
   </div>
 </section>
 </main>
-
 <footer><div class="wrap">
   BLOODY ROAR THAILAND เป็นโครงการแฟนเกมที่ไม่เป็นทางการ ไม่มีความเกี่ยวข้องหรือได้รับการรับรองจากเจ้าของเครื่องหมายการค้าหรือทรัพย์สินทางปัญญาใด ๆ ผู้ให้บริการต้องตรวจสอบและมีสิทธิ์ที่จำเป็นในการจัดเก็บและเผยแพร่ไฟล์เกมผ่านเซิร์ฟเวอร์ก่อนเปิดให้บุคคลอื่นใช้งาน
 </div></footer>
+<!-- Multiplayer room menu -->
+<div class="modal" id="rooms-modal" role="dialog" aria-modal="true" aria-labelledby="rooms-title">
+  <div class="dialog">
+    <button class="close" onclick="closeRooms()" aria-label="ปิด">×</button>
+    <div class="eyebrow">BLOODY ROAR · ONLINE</div>
+    <h2 id="rooms-title">ระบบห้องออนไลน์</h2>
+    <p>สร้างห้องเพื่อรับรหัส 6 ตัว หรือกรอกรหัสห้องที่เพื่อนส่งให้</p>
+<label class="field">ชื่อผู้เล่น
+  <input id="room-name" maxlength="20" value="ผู้เล่น 1" autocomplete="nickname">
+</label>
+<label class="field">รหัสห้อง (กรณีเข้าร่วม)
+  <input id="room-code" maxlength="6" placeholder="กรอกรหัส 6 ตัว" autocapitalize="characters">
+</label>
+<div class="dialog-buttons">
+  <button id="create-room-btn" onclick="createRoom()">＋ สร้างห้องใหม่</button>
+  <button id="join-room-btn" class="secondary-action" onclick="joinRoom()">เข้าร่วมห้อง</button>
+  <button class="secondary-action" onclick="checkWorker()">ตรวจสอบเซิร์ฟเวอร์</button>
+</div>
+<div id="room-result" role="status" aria-live="polite">พร้อมเชื่อมต่อ Worker</div>
+<div id="room-code-display" class="room-code" hidden></div>
+<button id="copy-code-btn" class="card-action" style="display:none" onclick="copyRoomCode()">คัดลอกรหัสห้อง</button>
+  </div>
+</div>
+<script>
+const ROOM_API = "https://br2-online-rooms.fukthefuk400.workers.dev";
+let roomSocket = null;
+let activeRoomCode = "";
+let activePlayerId = "";
+const $ = id => document.getElementById(id);
+function openRooms(){
+  $("rooms-modal").classList.add("open");
+  $("room-result").textContent = "พร้อมเชื่อมต่อ Worker";
+}
+function closeRooms(){
+  $("rooms-modal").classList.remove("open");
+}
+$("rooms-modal").addEventListener("click",e=>{
+  if(e.target === $("rooms-modal")) closeRooms();
+});
+function setRoomStatus(message){
+  $("room-result").textContent = message;
+}
+function setBusy(busy){
+  $("create-room-btn").disabled = busy;
+  $("join-room-btn").disabled = busy;
+  $("create-room-btn").style.opacity = busy ? ".5" : "1";
+  $("join-room-btn").style.opacity = busy ? ".5" : "1";
+}
+async function checkWorker(){
+  setRoomStatus("กำลังตรวจสอบ Worker...");
+  try{
+    const response = await fetch(ROOM_API + "/health",{cache:"no-store"});
+    const data = await response.json();
+    if(!response.ok || !data.ok) throw new Error("HTTP " + response.status);
+    setRoomStatus("เซิร์ฟเวอร์พร้อมใช้งาน\n" + (data.service || "BR2 online rooms"));
+  }catch(error){
+    setRoomStatus("ตรวจสอบไม่สำเร็จ: " + error.message);
+  }
+}
+async function createRoom(){
+  const name = ($("room-name").value.trim() || "ผู้เล่น 1").slice(0,20);
+  setBusy(true);
+  $("room-code-display").hidden = true;
+  $("copy-code-btn").style.display = "none";
+  setRoomStatus("กำลังสร้างห้องและติดต่อ Worker...");
+  try{
+    const response = await fetch(ROOM_API + "/create",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name})
+    });
+    const data = await response.json();
+    if(!response.ok || !data.room) throw new Error(data.error || "HTTP " + response.status);
+    const room = data.room;
+    const player = room.players && room.players[0];
+    if(!room.code || !player || !player.id) throw new Error("ข้อมูลห้องไม่ครบ");
+    activeRoomCode = room.code;
+    activePlayerId = player.id;
+    $("room-code").value = room.code;
+    $("room-code-display").textContent = room.code;
+    $("room-code-display").hidden = false;
+    $("copy-code-btn").style.display = "block";
+    try{
+      localStorage.setItem("br2-player-" + room.code, player.id);
+    }catch(_){}
+    setRoomStatus("สร้างห้องสำเร็จ!\nรหัสห้อง: " + room.code + "\nสถานะ: " + room.status + "\nผู้เล่น: " + room.players.length + "/2 คน\nกำลังเชื่อมต่อห้อง...");
+    connectRoomSocket(room.code,player.id,"host");
+  }catch(error){
+    setRoomStatus("สร้างห้องไม่สำเร็จ:\n" + error.message);
+  }finally{
+    setBusy(false);
+  }
+}
+async function joinRoom(){
+  const code = $("room-code").value.trim().toUpperCase();
+  const name = ($("room-name").value.trim() || "ผู้เล่น 2").slice(0,20);
+  if(!/^[A-Z0-9]{6}$/.test(code)){
+    setRoomStatus("กรุณากรอกรหัสห้องให้ครบ 6 ตัว");
+    return;
+  }
+  setBusy(true);
+  setRoomStatus("กำลังเข้าร่วมห้อง " + code + "...");
+  try{
+    const response = await fetch(ROOM_API + "/room/" + code + "/join",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name})
+    });
+    const data = await response.json();
+    if(!response.ok || !data.playerId) throw new Error(data.error || "HTTP " + response.status);
+    activeRoomCode = code;
+    activePlayerId = data.playerId;
+    try{
+      localStorage.setItem("br2-player-" + code,data.playerId);
+    }catch(_){}
+    setRoomStatus("เข้าร่วมห้องสำเร็จ!\nรหัสห้อง: " + code + "\nกำลังเชื่อมต่อ...");
+    $("room-code-display").textContent = code;
+    $("room-code-display").hidden = false;
+    connectRoomSocket(code,data.playerId,"guest");
+  }catch(error){
+    setRoomStatus("เข้าร่วมห้องไม่สำเร็จ:\n" + error.message);
+  }finally{
+    setBusy(false);
+  }
+}
+function connectRoomSocket(code,playerId,role){
+  if(roomSocket){
+    try{roomSocket.close();}catch(_){}
+  }
+  const wsUrl = ROOM_API.replace(/^https:/,"wss:") + "/room/" + code + "/ws";
+  const ws = new WebSocket(wsUrl);
+  roomSocket = ws;
+  ws.onopen = ()=>{
+    if(roomSocket === ws){
+      setRoomStatus("เชื่อมต่อห้องสำเร็จ!\nรหัสห้อง: " + code + "\nบทบาท: " + (role === "host" ? "เจ้าของห้อง" : "ผู้เข้าร่วม") + "\nรอเพื่อนเข้าร่วม...");
+    }
+  };
+  ws.onmessage = event=>{
+    try{
+      const data = JSON.parse(event.data);
+      if(data.type === "state" && data.room){
+        const room = data.room;
+        setRoomStatus("เชื่อมต่อห้องแล้ว!\nรหัสห้อง: " + room.code + "\nสถานะ: " + room.status + "\nผู้เล่น: " + (room.players || []).length + "/2 คน\n" + (room.status === "ready" ? "ผู้เล่นครบแล้ว" : "กำลังรอผู้เล่นอีกคน"));
+      }else if(data.type === "error"){
+        setRoomStatus("Worker แจ้งข้อผิดพลาด: " + data.message);
+      }
+    }catch(_){
+      setRoomStatus("ได้รับข้อมูลจากห้อง แต่แปลผลไม่ได้");
+    }
+  };
+  ws.onerror = ()=>{
+    if(roomSocket === ws) setRoomStatus("สร้างห้องแล้ว แต่เชื่อมต่อ WebSocket ไม่สำเร็จ");
+  };
+  ws.onclose = ()=>{
+    if(roomSocket === ws) setRoomStatus("การเชื่อมต่อห้องสิ้นสุดแล้ว");
+  };
+}
+async function copyRoomCode(){
+  if(!activeRoomCode) return;
+  try{
+    await navigator.clipboard.writeText(activeRoomCode);
+    setRoomStatus("คัดลอกรหัสห้อง " + activeRoomCode + " แล้ว");
+  }catch(_){
+    $("room-code").focus();
+    $("room-code").select();
+    setRoomStatus("เลือกข้อความรหัสห้องแล้ว กรุณากดคัดลอก");
+  }
+}
+</script>
 </body>
 </html>
