@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10131a">
-<title>BR2 Multiplayer Movement</title>
+<title>BR2 Network Movement V2</title>
 
 <style>
 *{box-sizing:border-box}
@@ -15,13 +15,11 @@ body{
  background:#10131a;
  color:#f5f7fb;
  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
- touch-action:pan-y;
 }
 
 main{max-width:680px;margin:18px auto}
 
 h1{font-size:25px}
-
 p{color:#aeb7c6;line-height:1.55}
 
 input,select{
@@ -60,10 +58,7 @@ button.secondary{background:#394354}
  gap:8px;
 }
 
-.row button{
- font-size:25px;
- padding:20px 8px;
-}
+.row button{font-size:25px;padding:20px 8px}
 
 .row button.active{
  background:#68d391;
@@ -130,10 +125,7 @@ button.secondary{background:#394354}
 #me{background:#68d391}
 #other{background:#f6c85f}
 
-.small{
- font-size:13px;
- color:#aeb7c6;
-}
+.small{font-size:13px;color:#aeb7c6}
 
 #log{
  font:12px ui-monospace,monospace;
@@ -146,10 +138,10 @@ button.secondary{background:#394354}
 <body>
 <main>
 
-<h1>BR2 Multiplayer Movement</h1>
+<h1>BR2 Network Movement V2</h1>
 
 <p>
-ระบบทดสอบการเคลื่อนไหวผู้เล่นออนไลน์แบบเรียลไทม์
+ระบบทดสอบ Multiplayer พร้อม Prediction และ Smooth Correction
 </p>
 
 <label>รหัสห้อง</label>
@@ -195,8 +187,8 @@ style="left:75%;top:50%">◀</div>
 </div>
 
 <p class="small">
-สีเขียว = ผู้เล่นเครื่องนี้<br>
-สีเหลือง = ผู้เล่นอีกเครื่อง
+สีเขียว = เครื่องนี้<br>
+สีเหลือง = อีกเครื่อง
 </p>
 
 </section>
@@ -208,21 +200,17 @@ style="left:75%;top:50%">◀</div>
 <div class="row">
 
 <span></span>
-
 <button data-move="up">↑</button>
-
 <span></span>
 
 <button data-move="left">←</button>
-
 <button data-move="down">↓</button>
-
 <button data-move="right">→</button>
 
 </div>
 
 <p class="small">
-กดปุ่มค้างเพื่อเคลื่อนที่ต่อเนื่อง
+กดค้างเพื่อเดินต่อเนื่อง สามารถเปลี่ยนทิศทางได้ทันที
 </p>
 
 </section>
@@ -230,7 +218,6 @@ style="left:75%;top:50%">◀</div>
 <section class="panel">
 
 <strong>บันทึกเหตุการณ์</strong>
-
 <div id="log">พร้อมทดสอบ</div>
 
 </section>
@@ -246,14 +233,19 @@ let room=null;
 let myId="";
 
 let positions={};
-let targets={};
+let remote={};
+
 let directions={};
 
 let activeDirection=null;
+
 let lastSend=0;
+let lastFrame=0;
 
 const SPEED=32;
-const SEND_RATE=60;
+const SEND_RATE=50;
+const MAX_PREDICTION=80;
+const MAX_REMOTE_SPEED=65;
 
 function log(s){
 
@@ -266,6 +258,105 @@ function log(s){
 function getPosition(id){
 
  return positions[id]||{x:25,y:50};
+
+}
+
+function clamp(v,min,max){
+
+ return Math.max(min,Math.min(max,v));
+
+}
+
+function sendPosition(){
+
+ if(!ws||ws.readyState!==WebSocket.OPEN||!myId)return;
+
+ const p=getPosition(myId);
+
+ ws.send(JSON.stringify({
+
+  type:"position",
+  playerId:myId,
+  x:p.x,
+  y:p.y,
+  direction:directions[myId]||"right"
+
+ }));
+
+ lastSend=performance.now();
+
+}
+
+function receivePosition(d){
+
+ if(d.playerId===myId)return;
+
+ const id=d.playerId;
+
+ const now=performance.now();
+
+ const next={
+  x:clamp(Number(d.x),3,97),
+  y:clamp(Number(d.y),7,93)
+ };
+
+ if(!Number.isFinite(next.x)||!Number.isFinite(next.y))return;
+
+ const old=remote[id];
+
+ if(!old){
+
+  remote[id]={
+   x:next.x,
+   y:next.y,
+   vx:0,
+   vy:0,
+   time:now
+  };
+
+ }else{
+
+  const dt=(now-old.time)/1000;
+
+  if(dt>0.005){
+
+   let vx=(next.x-old.x)/dt;
+   let vy=(next.y-old.y)/dt;
+
+   const speed=Math.hypot(vx,vy);
+
+   if(speed>MAX_REMOTE_SPEED){
+
+    const scale=MAX_REMOTE_SPEED/speed;
+
+    vx*=scale;
+    vy*=scale;
+
+   }
+
+   old.vx=vx;
+   old.vy=vy;
+
+  }
+
+  old.x=next.x;
+  old.y=next.y;
+  old.time=now;
+
+ }
+
+ if(d.direction){
+  directions[id]=d.direction;
+ }
+
+}
+
+function renderPlayer(id,element){
+
+ const p=positions[id]||{x:25,y:50};
+
+ element.style.left=p.x+"%";
+ element.style.top=p.y+"%";
 
 }
 
@@ -283,32 +374,43 @@ function draw(){
 
  const mine=getPosition(myId);
 
- const other=otherPlayer?
- getPosition(otherPlayer.id):{x:75,y:50};
-
- $("me").style.left=mine.x+"%";
- $("me").style.top=mine.y+"%";
-
- $("other").style.left=other.x+"%";
- $("other").style.top=other.y+"%";
+ renderPlayer(myId,$("me"));
 
  $("meName").textContent=
  minePlayer?.name||"ผู้เล่นของฉัน";
 
- $("otherName").textContent=
- otherPlayer?.name||"รอผู้เล่นอีกคน";
-
  $("meName").style.left=mine.x+"%";
  $("meName").style.top=mine.y+"%";
 
- $("otherName").style.left=other.x+"%";
- $("otherName").style.top=other.y+"%";
+ if(otherPlayer){
+
+  const other=positions[otherPlayer.id]||
+  {x:75,y:50};
+
+  renderPlayer(otherPlayer.id,$("other"));
+
+  $("otherName").textContent=otherPlayer.name;
+
+  $("otherName").style.left=other.x+"%";
+  $("otherName").style.top=other.y+"%";
+
+  $("other").textContent=
+  directions[otherPlayer.id]==="left"?"◀":
+  directions[otherPlayer.id]==="right"?"▶":
+  directions[otherPlayer.id]==="up"?"↑":
+  directions[otherPlayer.id]==="down"?"↓":"◀";
+
+ }else{
+
+  $("otherName").textContent="รอผู้เล่นอีกคน";
+
+ }
 
  $("me").textContent=
- directions[myId]==="left"?"◀":"▶";
-
- $("other").textContent=
- otherPlayer&&directions[otherPlayer.id]==="left"?"◀":"▶";
+ directions[myId]==="left"?"◀":
+ directions[myId]==="right"?"▶":
+ directions[myId]==="up"?"↑":
+ directions[myId]==="down"?"↓":"▶";
 
 }
 
@@ -317,7 +419,6 @@ function updateRoom(r){
  room=r;
 
  const select=$("player");
-
  const old=select.value;
 
  select.innerHTML=
@@ -327,7 +428,7 @@ function updateRoom(r){
  ).join("");
 
  if(old&&(r.players||[]).some(p=>p.id===old)){
- select.value=old;
+  select.value=old;
  }
 
  $("status").textContent=
@@ -342,89 +443,74 @@ $("connect").onclick=()=>{
  const code=$("code").value.trim().toUpperCase();
 
  if(!/^[A-Z0-9]{6}$/.test(code)){
- alert("กรุณาใส่รหัสห้อง 6 ตัว");
- return;
+  alert("กรุณาใส่รหัสห้อง 6 ตัว");
+  return;
  }
 
  if(ws)ws.close();
 
  stopMove();
 
+ remote={};
+ positions={};
+ directions={};
+
  $("code").value=code;
-
  $("log").textContent="";
-
  $("status").textContent="กำลังเชื่อมต่อ...";
 
  ws=new WebSocket(`${BASE}/room/${code}/ws`);
 
  ws.onopen=()=>{
- log("WebSocket connected");
+  log("WebSocket connected");
  };
 
  ws.onmessage=e=>{
 
- try{
+  try{
 
- const d=JSON.parse(e.data);
+   const d=JSON.parse(e.data);
 
- if(d.type==="state"&&d.room){
+   if(d.type==="state"&&d.room){
 
- updateRoom(d.room);
+    updateRoom(d.room);
+    log("รับข้อมูลห้องแล้ว");
 
- log("รับข้อมูลห้องแล้ว");
+   }
 
- }
+   else if(d.type==="position"){
 
- else if(d.type==="position"){
+    receivePosition(d);
 
- if(d.playerId===myId)return;
+   }
 
- const id=d.playerId;
+   else if(d.type==="error"){
 
- const next={x:d.x,y:d.y};
+    log("Server: "+d.message);
 
- if(!positions[id]){
- positions[id]={...next};
- }
+   }
 
- targets[id]=next;
+  }catch(err){
 
- if(d.direction){
- directions[id]=d.direction;
- }
+   log("อ่านข้อมูลไม่ได้: "+err.message);
 
- }
-
- else if(d.type==="error"){
-
- log("Server: "+d.message);
-
- }
-
- }catch(err){
-
- log("อ่านข้อมูลไม่ได้: "+err.message);
-
- }
+  }
 
  };
 
  ws.onclose=e=>{
 
- stopMove();
+  stopMove();
 
- $("status").textContent=
- `การเชื่อมต่อปิดแล้ว (${e.code})`;
+  $("status").textContent=
+  `การเชื่อมต่อปิดแล้ว (${e.code})`;
 
- log("WebSocket closed "+e.code);
+  log("WebSocket closed "+e.code);
 
  };
 
  ws.onerror=()=>{
-
- log("WebSocket error");
-
+  log("WebSocket error");
  };
 
 };
@@ -433,55 +519,40 @@ $("player").onchange=()=>{
 
  myId=$("player").value;
 
+ if(myId&&!positions[myId]){
+  positions[myId]={x:25,y:50};
+ }
+
  draw();
 
  if(myId)log("เลือกผู้เล่น "+myId.slice(0,6));
 
 };
 
-function sendPosition(){
-
- if(!ws||ws.readyState!==WebSocket.OPEN)return;
-
- if(!myId)return;
-
- const p=getPosition(myId);
-
- ws.send(JSON.stringify({
-
- type:"position",
-
- playerId:myId,
-
- x:p.x,
-
- y:p.y,
-
- direction:directions[myId]||"right"
-
- }));
-
-}
-
 function startMove(dir){
 
  if(!ws||ws.readyState!==WebSocket.OPEN){
- log("ยังไม่ได้เชื่อมต่อ");
- return;
+  log("ยังไม่ได้เชื่อมต่อ");
+  return;
  }
 
  if(!myId){
- log("กรุณาเลือกผู้เล่นประจำเครื่อง");
- return;
+  log("กรุณาเลือกผู้เล่นประจำเครื่อง");
+  return;
  }
+
+ if(activeDirection===dir)return;
 
  activeDirection=dir;
 
  directions[myId]=dir;
 
  document.querySelectorAll("[data-move]").forEach(b=>{
- b.classList.toggle("active",b.dataset.move===dir);
+  b.classList.toggle("active",b.dataset.move===dir);
  });
+
+ // ส่งทิศทางทันทีเมื่อมีการเปลี่ยน
+ sendPosition();
 
 }
 
@@ -490,7 +561,7 @@ function stopMove(){
  activeDirection=null;
 
  document.querySelectorAll("[data-move]").forEach(b=>{
- b.classList.remove("active");
+  b.classList.remove("active");
  });
 
 }
@@ -499,50 +570,55 @@ function movementLoop(time){
 
  requestAnimationFrame(movementLoop);
 
- const dt=Math.min((time-(movementLoop.last||time))/1000,0.05);
+ const dt=lastFrame?
+ Math.min((time-lastFrame)/1000,0.05):0;
 
- movementLoop.last=time;
+ lastFrame=time;
 
  if(!room)return;
 
+ // การเคลื่อนที่ของผู้เล่นเครื่องนี้
+
  if(activeDirection&&myId&&ws&&ws.readyState===WebSocket.OPEN){
 
- const p=getPosition(myId);
+  const p=getPosition(myId);
 
- const amount=SPEED*dt;
+  const amount=SPEED*dt;
 
- if(activeDirection==="left")p.x-=amount;
- if(activeDirection==="right")p.x+=amount;
- if(activeDirection==="up")p.y-=amount;
- if(activeDirection==="down")p.y+=amount;
+  if(activeDirection==="left")p.x-=amount;
+  if(activeDirection==="right")p.x+=amount;
+  if(activeDirection==="up")p.y-=amount;
+  if(activeDirection==="down")p.y+=amount;
 
- p.x=Math.max(3,Math.min(97,p.x));
- p.y=Math.max(7,Math.min(93,p.y));
+  p.x=clamp(p.x,3,97);
+  p.y=clamp(p.y,7,93);
 
- positions[myId]=p;
+  positions[myId]=p;
 
- if(time-lastSend>=SEND_RATE){
-
- sendPosition();
-
- lastSend=time;
+  if(time-lastSend>=SEND_RATE){
+   sendPosition();
+  }
 
  }
 
- }
+ // คาดการณ์ตำแหน่งผู้เล่นอีกเครื่อง
 
- Object.keys(targets).forEach(id=>{
+ Object.keys(remote).forEach(id=>{
 
- const current=positions[id];
+  const r=remote[id];
 
- const target=targets[id];
+  const age=Math.min(
+   (performance.now()-r.time)/1000,
+   MAX_PREDICTION/1000
+  );
 
- if(!current||!target)return;
+  const predictedX=r.x+r.vx*age;
+  const predictedY=r.y+r.vy*age;
 
- const smooth=1-Math.exp(-20*dt);
-
- current.x+=(target.x-current.x)*smooth;
- current.y+=(target.y-current.y)*smooth;
+  positions[id]={
+   x:clamp(predictedX,3,97),
+   y:clamp(predictedY,7,93)
+  };
 
  });
 
@@ -556,19 +632,21 @@ document.querySelectorAll("[data-move]").forEach(b=>{
 
  b.addEventListener("pointerdown",e=>{
 
- e.preventDefault();
+  e.preventDefault();
 
- b.setPointerCapture(e.pointerId);
+  try{
+   b.setPointerCapture(e.pointerId);
+  }catch(err){}
 
- startMove(b.dataset.move);
+  startMove(b.dataset.move);
 
  });
 
  b.addEventListener("pointerup",e=>{
 
- e.preventDefault();
+  e.preventDefault();
 
- stopMove();
+  stopMove();
 
  });
 
