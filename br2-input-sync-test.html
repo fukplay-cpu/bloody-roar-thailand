@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BR2 Input Sync Test</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;padding:20px 16px;background:#10131a;color:#fff;
+ font-family:-apple-system,BlinkMacSystemFont,sans-serif
+}
+main{max-width:650px;margin:auto}
+h1{font-size:25px}
+p{color:#aeb7c6;line-height:1.5}
+input,select,button{
+ width:100%;padding:15px;margin:7px 0;
+ border:0;border-radius:12px;font-size:17px
+}
+input,select{background:#202631;color:white;border:1px solid #596477}
+button{background:#2878f0;color:white;font-weight:bold;touch-action:none}
+.secondary{background:#394354}
+.panel{background:#202631;padding:16px;border-radius:16px;margin-top:16px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{min-height:75px;font-size:22px;background:#2878f0}
+.key.pressed{background:#16a05a;transform:scale(.96)}
+.remote{background:#343e50}
+#log{font:12px monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+#remoteStatus{font-size:20px;color:#68d391;min-height:30px}
+</style>
+</head>
+<body>
+<main>
+
+<h1>BR2 Multiplayer Input Test</h1>
+<p>ทดสอบระบบส่งคำสั่งกดและปล่อยปุ่มระหว่างผู้เล่น 2 เครื่อง</p>
+
+<section class="panel">
+<label>รหัสห้อง</label>
+<input id="code" maxlength="6" placeholder="ใส่รหัสห้อง 6 ตัว">
+
+<label>เลือกผู้เล่นประจำเครื่องนี้</label>
+<select id="player">
+<option value="">เชื่อมต่อเพื่อโหลดรายชื่อ</option>
+</select>
+
+<button id="connect">เชื่อมต่อห้อง</button>
+<button id="disconnect" class="secondary">ตัดการเชื่อมต่อ</button>
+<div id="status">ยังไม่ได้เชื่อมต่อ</div>
+</section>
+
+<section class="panel">
+<h3>ปุ่มควบคุมเครื่องนี้</h3>
+<p>กดค้างเพื่อส่ง DOWN และปล่อยเพื่อส่ง UP</p>
+
+<div class="grid">
+<button class="key" data-key="up">↑</button>
+<button class="key" data-key="x">X</button>
+<button class="key" data-key="y">Y</button>
+
+<button class="key" data-key="left">←</button>
+<button class="key" data-key="down">↓</button>
+<button class="key" data-key="right">→</button>
+
+<button class="key" data-key="a">A</button>
+<button class="key" data-key="b">B</button>
+<button class="key" data-key="start">START</button>
+
+<button class="key" data-key="l">L</button>
+<button class="key" data-key="r">R</button>
+<button class="key" data-key="select">SELECT</button>
+</div>
+</section>
+
+<section class="panel">
+<h3>สถานะปุ่มจากอีกเครื่อง</h3>
+<div id="remoteStatus">ยังไม่มีคำสั่งจากอีกเครื่อง</div>
+<div id="remoteButtons">-</div>
+</section>
+
+<section class="panel">
+<h3>บันทึกเหตุการณ์</h3>
+<div id="log">พร้อมทดสอบ</div>
+</section>
+
+</main>
+
+<script>
+const BASE="wss://br2-online-rooms.fukthefuk400.workers.dev";
+const $=id=>document.getElementById(id);
+
+let ws=null;
+let room=null;
+let myId="";
+let remoteHeld={};
+
+function log(s){
+ $("log").textContent=
+ `[${new Date().toLocaleTimeString("th-TH")}] ${s}\n`+
+ $("log").textContent;
+}
+
+function updateRoom(r){
+ room=r;
+ const select=$("player");
+ const old=select.value;
+
+ select.innerHTML=
+ '<option value="">เลือกผู้เล่น</option>'+
+ (r.players||[]).map(p=>
+ `<option value="${p.id}">${p.name}</option>`
+ ).join("");
+
+ if(old&&(r.players||[]).some(p=>p.id===old)){
+  select.value=old;
+ }
+
+ $("status").textContent=
+ `ห้อง ${r.code||$("code").value} · ${r.status} · ${(r.players||[]).length}/2 คน`;
+}
+
+$("connect").onclick=()=>{
+ const code=$("code").value.trim().toUpperCase();
+
+ if(!/^[A-Z0-9]{6}$/.test(code)){
+  alert("กรุณาใส่รหัสห้อง 6 ตัว");
+  return;
+ }
+
+ if(ws)ws.close();
+
+ $("code").value=code;
+ $("status").textContent="กำลังเชื่อมต่อ...";
+ $("log").textContent="";
+
+ ws=new WebSocket(`${BASE}/room/${code}/ws`);
+
+ ws.onopen=()=>{
+  log("WebSocket connected");
+ };
+
+ ws.onmessage=e=>{
+  try{
+   const d=JSON.parse(e.data);
+
+   if(d.type==="state"&&d.room){
+    updateRoom(d.room);
+    log("รับข้อมูลห้องแล้ว");
+   }
+
+   else if(d.type==="input"){
+    if(d.playerId===myId)return;
+
+    const name=d.button;
+
+    if(d.action==="down"){
+     remoteHeld[name]=true;
+     log(`อีกเครื่องกด ${name}`);
+    }
+
+    if(d.action==="up"){
+     delete remoteHeld[name];
+     log(`อีกเครื่องปล่อย ${name}`);
+    }
+
+    updateRemote();
+   }
+
+   else if(d.type==="error"){
+    log("Server: "+d.message);
+   }
+
+  }catch(err){
+   log("อ่านข้อมูลไม่ได้: "+err.message);
+  }
+ };
+
+ ws.onclose=e=>{
+  $("status").textContent=`การเชื่อมต่อปิดแล้ว (${e.code})`;
+  log("WebSocket closed "+e.code);
+ };
+
+ ws.onerror=()=>{
+  log("WebSocket error");
+ };
+};
+
+$("player").onchange=()=>{
+ myId=$("player").value;
+ if(myId)log("เลือกผู้เล่น "+myId.slice(0,6));
+};
+
+function sendInput(button,action){
+ if(!ws||ws.readyState!==WebSocket.OPEN){
+  log("ยังไม่ได้เชื่อมต่อ");
+  return;
+ }
+
+ if(!myId){
+  log("กรุณาเลือกผู้เล่นของเครื่องนี้");
+  return;
+ }
+
+ ws.send(JSON.stringify({
+  type:"input",
+  playerId:myId,
+  button:button,
+  action:action
+ }));
+}
+
+function updateRemote(){
+ const keys=Object.keys(remoteHeld);
+
+ $("remoteStatus").textContent=
+ keys.length?"กำลังกดปุ่ม":"ไม่มีปุ่มถูกกด";
+
+ $("remoteButtons").textContent=
+ keys.length?keys.join(" + "):"-";
+}
+
+document.querySelectorAll("[data-key]").forEach(btn=>{
+ const key=btn.dataset.key;
+ let isDown=false;
+
+ function down(e){
+  e.preventDefault();
+  if(isDown)return;
+  isDown=true;
+  btn.classList.add("pressed");
+  sendInput(key,"down");
+ }
+
+ function up(e){
+  if(e)e.preventDefault();
+  if(!isDown)return;
+  isDown=false;
+  btn.classList.remove("pressed");
+  sendInput(key,"up");
+ }
+
+ btn.addEventListener("pointerdown",down);
+ btn.addEventListener("pointerup",up);
+ btn.addEventListener("pointercancel",up);
+ btn.addEventListener("lostpointercapture",up);
+});
+
+$("disconnect").onclick=()=>{
+ if(ws)ws.close(1000,"disconnect");
+ ws=null;
+ $("status").textContent="ตัดการเชื่อมต่อแล้ว";
+};
+</script>
+</body>
+</html>
