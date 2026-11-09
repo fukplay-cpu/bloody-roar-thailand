@@ -4,113 +4,287 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10131a">
-<title>BR2 Position Sync Test</title>
+<title>BR2 Multiplayer Movement</title>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;padding:20px 16px;background:#10131a;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+
+body{
+ margin:0;
+ padding:20px 16px;
+ background:#10131a;
+ color:#f5f7fb;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+ touch-action:pan-y;
+}
+
 main{max-width:680px;margin:18px auto}
-h1{font-size:27px;line-height:1.3}
+
+h1{font-size:25px}
+
 p{color:#aeb7c6;line-height:1.55}
-input,select{width:100%;padding:15px;border-radius:13px;border:1px solid #596170;background:#202631;color:white;font-size:18px;margin:7px 0 12px}
+
+input,select{
+ width:100%;
+ padding:15px;
+ border-radius:13px;
+ border:1px solid #596170;
+ background:#202631;
+ color:white;
+ font-size:18px;
+ margin:7px 0 12px;
+}
+
 label{display:block;margin-top:14px}
-button{border:0;border-radius:13px;background:#2878f0;color:white;font-size:17px;font-weight:700;padding:15px;width:100%;margin:7px 0;touch-action:manipulation}
+
+button{
+ border:0;
+ border-radius:13px;
+ background:#2878f0;
+ color:white;
+ font-size:20px;
+ font-weight:700;
+ padding:15px;
+ width:100%;
+ margin:7px 0;
+ touch-action:none;
+ user-select:none;
+ -webkit-user-select:none;
+}
+
 button.secondary{background:#394354}
-.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.row button{font-size:24px;padding:18px 8px}
-.panel{background:#202631;border-radius:17px;padding:16px;margin-top:16px;line-height:1.6;overflow-wrap:anywhere}
-.arena{height:260px;position:relative;border:2px solid #586477;border-radius:16px;background:linear-gradient(#273142 1px,transparent 1px),linear-gradient(90deg,#273142 1px,transparent 1px);background-size:10% 10%;overflow:hidden;margin-top:12px}
-.token{position:absolute;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#10131a;transform:translate(-50%,-50%);box-shadow:0 2px 12px #0008;z-index:2}
-.nametag{position:absolute;transform:translate(-50%,calc(-100% - 24px));padding:4px 9px;border-radius:8px;background:#0b1019;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;border:1px solid #596477;max-width:130px;overflow:hidden;text-overflow:ellipsis;z-index:3;pointer-events:none}
+
+.row{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:8px;
+}
+
+.row button{
+ font-size:25px;
+ padding:20px 8px;
+}
+
+.row button.active{
+ background:#68d391;
+ color:#10131a;
+ transform:scale(.95);
+}
+
+.panel{
+ background:#202631;
+ border-radius:17px;
+ padding:16px;
+ margin-top:16px;
+ line-height:1.6;
+ overflow-wrap:anywhere;
+}
+
+.arena{
+ height:280px;
+ position:relative;
+ border:2px solid #586477;
+ border-radius:16px;
+ background:
+ linear-gradient(#273142 1px,transparent 1px),
+ linear-gradient(90deg,#273142 1px,transparent 1px);
+ background-size:10% 10%;
+ overflow:hidden;
+ margin-top:12px;
+}
+
+.token{
+ position:absolute;
+ width:36px;
+ height:36px;
+ border-radius:50%;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ font-weight:900;
+ font-size:20px;
+ color:#10131a;
+ transform:translate(-50%,-50%);
+ box-shadow:0 2px 12px #0008;
+ z-index:2;
+}
+
+.nametag{
+ position:absolute;
+ transform:translate(-50%,calc(-100% - 25px));
+ padding:4px 9px;
+ border-radius:8px;
+ background:#0b1019;
+ color:white;
+ font-size:12px;
+ font-weight:700;
+ white-space:nowrap;
+ border:1px solid #596477;
+ max-width:130px;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ z-index:3;
+ pointer-events:none;
+}
+
 #me{background:#68d391}
 #other{background:#f6c85f}
-.small{font-size:13px;color:#aeb7c6}
-#log{font:12px ui-monospace,monospace;white-space:pre-wrap}
+
+.small{
+ font-size:13px;
+ color:#aeb7c6;
+}
+
+#log{
+ font:12px ui-monospace,monospace;
+ white-space:pre-wrap;
+}
+
 </style>
 </head>
+
 <body>
 <main>
 
-<h1>ทดสอบซิงก์ตำแหน่งผู้เล่น</h1>
+<h1>BR2 Multiplayer Movement</h1>
 
-<p>หน้านี้เป็นสนามทดสอบแยกจากตัวเกม ใช้ตรวจว่าการขยับผู้เล่นบนเครื่องหนึ่งส่งตำแหน่งไปอีกเครื่องแบบเรียลไทม์ได้หรือไม่</p>
+<p>
+ระบบทดสอบการเคลื่อนไหวผู้เล่นออนไลน์แบบเรียลไทม์
+</p>
 
 <label>รหัสห้อง</label>
-<input id="code" maxlength="6" placeholder="เช่น SQ8BD3" autocapitalize="characters">
+
+<input id="code" maxlength="6"
+placeholder="เช่น SQ8BD3"
+autocapitalize="characters">
 
 <label>เลือกผู้เล่นประจำเครื่องนี้</label>
+
 <select id="player">
 <option value="">เชื่อมต่อเพื่อโหลดรายชื่อก่อน</option>
 </select>
 
 <button id="connect">เชื่อมต่อห้อง</button>
-<button id="disconnect" class="secondary">ตัดการเชื่อมต่อ</button>
+
+<button id="disconnect" class="secondary">
+ตัดการเชื่อมต่อ
+</button>
 
 <section class="panel" id="status">
 ยังไม่ได้เชื่อมต่อ
 </section>
 
 <section class="panel">
-<strong>สนามทดสอบ</strong>
+
+<strong>สนามทดสอบ Multiplayer</strong>
 
 <div class="arena" id="arena">
 
-<div class="nametag" id="meName" style="left:25%;top:50%">ฉัน</div>
+<div class="nametag" id="meName"
+style="left:25%;top:50%">ฉัน</div>
 
-<div class="nametag" id="otherName" style="left:75%;top:50%">อีกคน</div>
+<div class="nametag" id="otherName"
+style="left:75%;top:50%">อีกคน</div>
 
-<div class="token" id="me" style="left:25%;top:50%">ฉัน</div>
+<div class="token" id="me"
+style="left:25%;top:50%">▶</div>
 
-<div class="token" id="other" style="left:75%;top:50%">อีกคน</div>
+<div class="token" id="other"
+style="left:75%;top:50%">◀</div>
 
 </div>
 
 <p class="small">
-วงกลมสีเขียวคือผู้เล่นเครื่องนี้ วงกลมสีเหลืองคือผู้เล่นอีกเครื่อง
+สีเขียว = ผู้เล่นเครื่องนี้<br>
+สีเหลือง = ผู้เล่นอีกเครื่อง
 </p>
+
 </section>
 
 <section class="panel">
-<strong>ควบคุมตำแหน่ง</strong>
+
+<strong>ควบคุมตัวละคร</strong>
 
 <div class="row">
+
 <span></span>
+
 <button data-move="up">↑</button>
+
 <span></span>
+
 <button data-move="left">←</button>
+
 <button data-move="down">↓</button>
+
 <button data-move="right">→</button>
+
 </div>
+
+<p class="small">
+กดปุ่มค้างเพื่อเคลื่อนที่ต่อเนื่อง
+</p>
+
 </section>
 
 <section class="panel">
+
 <strong>บันทึกเหตุการณ์</strong>
+
 <div id="log">พร้อมทดสอบ</div>
+
 </section>
 
 <script>
+
 const BASE="wss://br2-online-rooms.fukthefuk400.workers.dev";
 
 const $=id=>document.getElementById(id);
 
-let ws=null,room=null,myId="",positions={};
+let ws=null;
+let room=null;
+let myId="";
+
+let positions={};
+let targets={};
+let directions={};
+
+let activeDirection=null;
+let lastSend=0;
+
+const SPEED=32;
+const SEND_RATE=100;
 
 function log(s){
+
  $("log").textContent=
  `[${new Date().toLocaleTimeString("th-TH")}] ${s}\n`+
  $("log").textContent;
+
+}
+
+function getPosition(id){
+
+ return positions[id]||{x:25,y:50};
+
 }
 
 function draw(){
 
  if(!room)return;
 
- const others=(room.players||[]).filter(p=>p.id!==myId);
+ const players=room.players||[];
 
- const mine=positions[myId]||{x:25,y:50};
+ const minePlayer=players.find(p=>p.id===myId);
 
- const other=others.length?
- (positions[others[0].id]||{x:75,y:50}):
- {x:75,y:50};
+ const others=players.filter(p=>p.id!==myId);
+
+ const otherPlayer=others[0];
+
+ const mine=getPosition(myId);
+
+ const other=otherPlayer?
+ getPosition(otherPlayer.id):{x:75,y:50};
 
  $("me").style.left=mine.x+"%";
  $("me").style.top=mine.y+"%";
@@ -118,28 +292,33 @@ function draw(){
  $("other").style.left=other.x+"%";
  $("other").style.top=other.y+"%";
 
- const minePlayer=(room.players||[]).find(p=>p.id===myId);
+ $("meName").textContent=
+ minePlayer?.name||"ผู้เล่นของฉัน";
 
- const otherPlayer=others[0];
+ $("otherName").textContent=
+ otherPlayer?.name||"รอผู้เล่นอีกคน";
 
- const mineName=minePlayer?.name||"ผู้เล่นของฉัน";
-
- const otherName=otherPlayer?.name||"รอผู้เล่นอีกคน";
-
- $("meName").textContent=mineName;
  $("meName").style.left=mine.x+"%";
  $("meName").style.top=mine.y+"%";
 
- $("otherName").textContent=otherName;
  $("otherName").style.left=other.x+"%";
  $("otherName").style.top=other.y+"%";
+
+ $("me").textContent=
+ directions[myId]==="left"?"◀":"▶";
+
+ $("other").textContent=
+ otherPlayer&&directions[otherPlayer.id]==="left"?"◀":"▶";
+
 }
 
 function updateRoom(r){
 
  room=r;
 
- const select=$("player"),old=select.value;
+ const select=$("player");
+
+ const old=select.value;
 
  select.innerHTML=
  '<option value="">เลือกผู้เล่น</option>'+
@@ -155,6 +334,7 @@ function updateRoom(r){
  `ห้อง ${r.code||$("code").value} · ${r.status} · ${(r.players||[]).length}/2 คน`;
 
  draw();
+
 }
 
 $("connect").onclick=()=>{
@@ -168,108 +348,245 @@ $("connect").onclick=()=>{
 
  if(ws)ws.close();
 
+ stopMove();
+
  $("code").value=code;
+
  $("log").textContent="";
+
  $("status").textContent="กำลังเชื่อมต่อ...";
 
  ws=new WebSocket(`${BASE}/room/${code}/ws`);
 
- ws.onopen=()=>log("WebSocket connected");
+ ws.onopen=()=>{
+ log("WebSocket connected");
+ };
 
  ws.onmessage=e=>{
 
-  try{
+ try{
 
-   const d=JSON.parse(e.data);
+ const d=JSON.parse(e.data);
 
-   if(d.type==="state"&&d.room){
-    updateRoom(d.room);
-    log("รับข้อมูลห้องแล้ว");
-   }
+ if(d.type==="state"&&d.room){
 
-   else if(d.type==="position"){
+ updateRoom(d.room);
 
-    positions[d.playerId]={x:d.x,y:d.y};
+ log("รับข้อมูลห้องแล้ว");
 
-    draw();
+ }
 
-    log(`รับตำแหน่ง ${d.playerId.slice(0,6)}: ${d.x}, ${d.y}`);
-   }
+ else if(d.type==="position"){
 
-   else if(d.type==="error"){
-    log("Server: "+d.message);
-   }
+ if(d.playerId===myId)return;
 
-  }catch(err){
+ const id=d.playerId;
 
-   log("อ่านข้อมูลไม่ได้: "+err.message);
+ const next={x:d.x,y:d.y};
 
-  }
+ if(!positions[id]){
+ positions[id]={...next};
+ }
+
+ targets[id]=next;
+
+ if(d.direction){
+ directions[id]=d.direction;
+ }
+
+ }
+
+ else if(d.type==="error"){
+
+ log("Server: "+d.message);
+
+ }
+
+ }catch(err){
+
+ log("อ่านข้อมูลไม่ได้: "+err.message);
+
+ }
+
  };
 
  ws.onclose=e=>{
-  $("status").textContent=`การเชื่อมต่อปิดแล้ว (${e.code})`;
-  log("WebSocket closed "+e.code);
+
+ stopMove();
+
+ $("status").textContent=
+ `การเชื่อมต่อปิดแล้ว (${e.code})`;
+
+ log("WebSocket closed "+e.code);
+
  };
 
- ws.onerror=()=>log("WebSocket error");
+ ws.onerror=()=>{
+
+ log("WebSocket error");
+
+ };
 
 };
 
 $("player").onchange=()=>{
+
  myId=$("player").value;
+
  draw();
+
  if(myId)log("เลือกผู้เล่น "+myId.slice(0,6));
+
 };
 
-function move(dir){
+function sendPosition(){
+
+ if(!ws||ws.readyState!==WebSocket.OPEN)return;
+
+ if(!myId)return;
+
+ const p=getPosition(myId);
+
+ ws.send(JSON.stringify({
+
+ type:"position",
+
+ playerId:myId,
+
+ x:p.x,
+
+ y:p.y,
+
+ direction:directions[myId]||"right"
+
+ }));
+
+}
+
+function startMove(dir){
 
  if(!ws||ws.readyState!==WebSocket.OPEN){
-  log("ยังไม่ได้เชื่อมต่อ");
-  return;
+ log("ยังไม่ได้เชื่อมต่อ");
+ return;
  }
 
  if(!myId){
-  log("กรุณาเลือกผู้เล่นของเครื่องนี้ก่อน");
-  return;
+ log("กรุณาเลือกผู้เล่นประจำเครื่อง");
+ return;
  }
 
- const p=positions[myId]||{x:25,y:50},step=4;
+ activeDirection=dir;
 
- if(dir==="left")p.x-=step;
- if(dir==="right")p.x+=step;
- if(dir==="up")p.y-=step;
- if(dir==="down")p.y+=step;
+ directions[myId]=dir;
+
+ document.querySelectorAll("[data-move]").forEach(b=>{
+ b.classList.toggle("active",b.dataset.move===dir);
+ });
+
+}
+
+function stopMove(){
+
+ activeDirection=null;
+
+ document.querySelectorAll("[data-move]").forEach(b=>{
+ b.classList.remove("active");
+ });
+
+}
+
+function movementLoop(time){
+
+ requestAnimationFrame(movementLoop);
+
+ const dt=Math.min((time-(movementLoop.last||time))/1000,0.05);
+
+ movementLoop.last=time;
+
+ if(!room)return;
+
+ if(activeDirection&&myId&&ws&&ws.readyState===WebSocket.OPEN){
+
+ const p=getPosition(myId);
+
+ const amount=SPEED*dt;
+
+ if(activeDirection==="left")p.x-=amount;
+ if(activeDirection==="right")p.x+=amount;
+ if(activeDirection==="up")p.y-=amount;
+ if(activeDirection==="down")p.y+=amount;
 
  p.x=Math.max(3,Math.min(97,p.x));
  p.y=Math.max(7,Math.min(93,p.y));
 
  positions[myId]=p;
 
- draw();
+ if(time-lastSend>=SEND_RATE){
 
- ws.send(JSON.stringify({
-  type:"position",
-  playerId:myId,
-  x:p.x,
-  y:p.y,
-  direction:dir==="left"?"left":"right"
- }));
+ sendPosition();
+
+ lastSend=time;
+
+ }
+
+ }
+
+ Object.keys(targets).forEach(id=>{
+
+ const current=positions[id];
+
+ const target=targets[id];
+
+ if(!current||!target)return;
+
+ const smooth=1-Math.exp(-12*dt);
+
+ current.x+=(target.x-current.x)*smooth;
+ current.y+=(target.y-current.y)*smooth;
+
+ });
+
+ draw();
 
 }
 
+requestAnimationFrame(movementLoop);
+
 document.querySelectorAll("[data-move]").forEach(b=>{
 
- b.addEventListener("click",()=>move(b.dataset.move));
+ b.addEventListener("pointerdown",e=>{
 
- b.addEventListener("touchstart",e=>{
-  e.preventDefault();
-  move(b.dataset.move);
- },{passive:false});
+ e.preventDefault();
+
+ b.setPointerCapture(e.pointerId);
+
+ startMove(b.dataset.move);
+
+ });
+
+ b.addEventListener("pointerup",e=>{
+
+ e.preventDefault();
+
+ stopMove();
+
+ });
+
+ b.addEventListener("pointercancel",stopMove);
+
+ b.addEventListener("lostpointercapture",stopMove);
+
+});
+
+document.addEventListener("visibilitychange",()=>{
+
+ if(document.hidden)stopMove();
 
 });
 
 $("disconnect").onclick=()=>{
+
+ stopMove();
 
  if(ws)ws.close(1000,"disconnect");
 
@@ -280,6 +597,7 @@ $("disconnect").onclick=()=>{
 };
 
 </script>
+
 </main>
 </body>
 </html>
