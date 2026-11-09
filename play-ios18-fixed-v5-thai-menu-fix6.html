@@ -3521,7 +3521,16 @@ try {
       input_player1_start:'enter',input_player1_select:'rshift',
       input_player1_analog_dpad_mode:0,
       input_player1_l_x_minus:'j',input_player1_l_x_plus:'l',input_player1_l_y_minus:'i',input_player1_l_y_plus:'k',
-      input_player1_r_x_minus:'f',input_player1_r_x_plus:'h',input_player1_r_y_minus:'t',input_player1_r_y_plus:'g' };
+      input_player1_r_x_minus:'f',input_player1_r_x_plus:'h',input_player1_r_y_minus:'t',input_player1_r_y_plus:'g',
+      // Player 2 needs its own keyboard bindings: Nostalgist resolves pressDown(button, 2)
+      // through input_player2_* and otherwise silently ignores every P2/remote input.
+      input_player2_up:'c',input_player2_down:'v',input_player2_left:'b',input_player2_right:'n',
+      input_player2_b:'o',input_player2_a:'u',input_player2_y:'y',input_player2_x:'p',
+      input_player2_l:'d',input_player2_r:'e',input_player2_l2:'f3',input_player2_r2:'f4',
+      input_player2_start:'f1',input_player2_select:'f2',
+      input_player2_analog_dpad_mode:0,
+      input_player2_l_x_minus:'num1',input_player2_l_x_plus:'num7',input_player2_l_y_minus:'num2',input_player2_l_y_plus:'num8',
+      input_player2_r_x_minus:'num4',input_player2_r_x_plus:'num6',input_player2_r_y_minus:'num9',input_player2_r_y_plus:'num5' };
     var DISC_EXT=['chd','pbp','cue','bin','iso','img','m3u','mdf'];
 
     var stage=document.getElementById('stage'), canvas=document.getElementById('screen'),
