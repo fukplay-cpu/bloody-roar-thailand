@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090911">
+
 <title>BLOODY ROAR THAILAND | ONLINE</title>
 
 <style>
@@ -17,12 +18,14 @@
   --green:#54d68b;
 }
 
-*{box-sizing:border-box}
+* { box-sizing:border-box; }
 
 body {
   margin:0;
   min-height:100vh;
-  background:radial-gradient(ellipse at 80% 0%,#70182e55,transparent 40%),#090911;
+  background:
+    radial-gradient(ellipse at 80% 0%,#70182e55,transparent 40%),
+    var(--bg);
   color:var(--text);
   font-family:system-ui,-apple-system,sans-serif;
 }
@@ -38,6 +41,7 @@ header {
   justify-content:space-between;
   align-items:center;
   border-bottom:1px solid #ffffff20;
+  gap:10px;
 }
 
 .brand {
@@ -45,7 +49,7 @@ header {
   font-size:17px;
 }
 
-.brand span {color:var(--red)}
+.brand span { color:var(--red); }
 
 .back {
   color:white;
@@ -66,7 +70,7 @@ header {
   font-weight:1000;
 }
 
-.hero h1 span {color:var(--red)}
+.hero h1 span { color:var(--red); }
 
 .hero p {
   color:var(--muted);
@@ -112,7 +116,7 @@ input {
   outline:none;
 }
 
-input:focus {border-color:var(--gold)}
+input:focus { border-color:var(--gold); }
 
 button {
   cursor:pointer;
@@ -121,6 +125,7 @@ button {
 
 .btn {
   width:100%;
+  min-height:48px;
   padding:15px;
   border:0;
   border-radius:10px;
@@ -136,9 +141,16 @@ button {
   border:1px solid #ffffff30;
 }
 
+.btn.start {
+  background:linear-gradient(135deg,#d9b45c,#a87924);
+  color:#17120a;
+  font-size:17px;
+  min-height:58px;
+}
+
 .btn:disabled {
-  opacity:.5;
-  cursor:wait;
+  opacity:.45;
+  cursor:not-allowed;
 }
 
 .codebox {
@@ -170,8 +182,8 @@ button {
   overflow-wrap:anywhere;
 }
 
-.status.ok {border-color:#54d68b80}
-.status.error {border-color:#e52b4380}
+.status.ok { border-color:#54d68b80; }
+.status.error { border-color:#e52b4380; }
 
 .players {
   display:grid;
@@ -187,6 +199,8 @@ button {
   border-radius:10px;
   text-align:center;
   font-size:13px;
+  min-width:0;
+  overflow-wrap:anywhere;
 }
 
 .player strong {
@@ -194,8 +208,16 @@ button {
   margin-top:7px;
 }
 
-.online {color:var(--green)}
-.waiting {color:var(--gold)}
+.online { color:var(--green); }
+.waiting { color:var(--gold); }
+
+.start-info {
+  margin-top:12px;
+  text-align:center;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.7;
+}
 
 footer {
   padding:35px 0;
@@ -204,6 +226,11 @@ footer {
   font-size:11px;
 }
 
+@media(max-width:380px) {
+  .hero h1 { font-size:28px; }
+  .panel { padding:17px; }
+  .code { font-size:29px; }
+}
 </style>
 </head>
 
@@ -230,8 +257,12 @@ footer {
 <h2>👤 ข้อมูลผู้เล่น</h2>
 
 <label>ชื่อผู้เล่น</label>
-<input id="playerName" maxlength="20"
-placeholder="ใส่ชื่อผู้เล่น" value="Player 1">
+<input
+  id="playerName"
+  maxlength="20"
+  placeholder="ใส่ชื่อผู้เล่น"
+  value="Player 1"
+>
 
 </section>
 
@@ -243,7 +274,7 @@ placeholder="ใส่ชื่อผู้เล่น" value="Player 1">
 สร้างห้องส่วนตัวและรับรหัสสำหรับเชิญเพื่อน
 </p>
 
-<button class="btn" id="createBtn" onclick="createRoom()">
+<button class="btn" id="createBtn" type="button">
 ＋ สร้างห้องใหม่
 </button>
 
@@ -258,12 +289,16 @@ placeholder="ใส่ชื่อผู้เล่น" value="Player 1">
 </p>
 
 <label>รหัสห้อง</label>
-<input id="roomCode" maxlength="6"
-placeholder="ABC123"
-autocapitalize="characters"
-autocomplete="off">
 
-<button class="btn" id="joinBtn" onclick="joinRoom()">
+<input
+  id="roomCode"
+  maxlength="6"
+  placeholder="ABC123"
+  autocapitalize="characters"
+  autocomplete="off"
+>
+
+<button class="btn" id="joinBtn" type="button">
 เข้าร่วมห้อง
 </button>
 
@@ -273,20 +308,22 @@ autocomplete="off">
 
 <h2>📡 สถานะห้องออนไลน์</h2>
 
-<div id="status" class="status">
+<div id="status" class="status" aria-live="polite">
 กำลังเตรียมระบบ...
 </div>
 
 <div class="codebox" id="codeBox" hidden>
+
 <div style="color:var(--muted);font-size:12px">
 รหัสห้องของคุณ
 </div>
 
 <div class="code" id="roomCodeDisplay">------</div>
 
-<button class="btn" onclick="copyCode()">
+<button class="btn" id="copyBtn" type="button">
 คัดลอกรหัสห้อง
 </button>
+
 </div>
 
 <div class="players">
@@ -303,11 +340,24 @@ autocomplete="off">
 
 </div>
 
-<button class="btn secondary" onclick="checkServer()">
+<button
+  class="btn start"
+  id="startGameBtn"
+  type="button"
+  disabled
+>
+🔒 รอผู้เล่นครบ 2 คน
+</button>
+
+<div class="start-info" id="startInfo">
+เมื่อผู้เล่นครบ 2 คน สามารถกดเริ่มเกมได้
+</div>
+
+<button class="btn secondary" id="checkBtn" type="button">
 ตรวจสอบเซิร์ฟเวอร์
 </button>
 
-<button class="btn secondary" onclick="disconnectRoom()">
+<button class="btn secondary" id="disconnectBtn" type="button">
 ออกจากห้อง
 </button>
 
@@ -321,16 +371,30 @@ ONLINE ROOM SYSTEM
 </footer>
 
 <script>
+"use strict";
+
+/* =================================
+   CONFIGURATION
+================================= */
 
 const API =
 "https://br2-online-rooms.fukthefuk400.workers.dev";
+
+const FIX6 =
+"./play-ios18-fixed-v5-thai-menu-fix6.html";
 
 let socket = null;
 let activeRoomCode = "";
 let activePlayerId = "";
 let busy = false;
+let gameStarted = false;
+let launchTimer = null;
 
 const $ = id => document.getElementById(id);
+
+/* =================================
+   STATUS
+================================= */
 
 function status(message,type="") {
   $("status").textContent = message;
@@ -344,47 +408,67 @@ function setBusy(value) {
 }
 
 function playerName() {
-  return ($("playerName").value.trim() || "Player").slice(0,20);
+  return (
+    $("playerName").value.trim() || "Player"
+  ).slice(0,20);
 }
+
+/* =================================
+   SERVER CHECK
+================================= */
 
 async function checkServer() {
   status("กำลังตรวจสอบเซิร์ฟเวอร์...");
 
   try {
-    const response = await fetch(API + "/health",{
+    const response = await fetch(API + "/health", {
       cache:"no-store"
     });
 
     const data = await response.json();
 
-    if(!response.ok || !data.ok) {
+    if (!response.ok || !data.ok) {
       throw new Error("HTTP " + response.status);
     }
 
     status(
       "● เซิร์ฟเวอร์พร้อมใช้งาน\n" +
-      "บริการ: " + (data.service || "BR2 online rooms"),
+      "บริการ: " + data.service,
       "ok"
     );
 
   } catch(error) {
-    status("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์\n" + error.message,"error");
+    status(
+      "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์\n" +
+      error.message,
+      "error"
+    );
   }
 }
 
+/* =================================
+   CREATE ROOM
+================================= */
+
 async function createRoom() {
 
-  if(busy) return;
+  if (busy) return;
 
   setBusy(true);
   closeSocket();
+  resetPlayers();
+
+  activeRoomCode = "";
+  activePlayerId = "";
+  gameStarted = false;
 
   $("codeBox").hidden = true;
+
   status("กำลังสร้างห้องออนไลน์...");
 
   try {
 
-    const response = await fetch(API + "/create",{
+    const response = await fetch(API + "/create", {
       method:"POST",
       headers:{
         "Content-Type":"application/json"
@@ -396,53 +480,63 @@ async function createRoom() {
 
     const data = await response.json();
 
-    if(!response.ok || !data.room) {
-      throw new Error(data.error || "ไม่สามารถสร้างห้องได้");
+    if (!response.ok || !data.room) {
+      throw new Error(
+        data.error || "ไม่สามารถสร้างห้องได้"
+      );
     }
 
     const room = data.room;
-    const player = room.players && room.players[0];
+    const player = room.players?.[0];
 
-    if(!room.code || !player || !player.id) {
+    if (!room.code || !player?.id) {
       throw new Error("ข้อมูลห้องไม่ครบ");
     }
 
     activeRoomCode = room.code;
     activePlayerId = player.id;
 
-    $("roomCode").value = room.code;
-    $("roomCodeDisplay").textContent = room.code;
-    $("codeBox").hidden = false;
+    savePlayerId(room.code,player.id);
 
-    try {
-      localStorage.setItem(
-        "br2-player-" + room.code,
-        player.id
-      );
-    } catch(e) {}
+    showRoomCode(room.code);
 
     connectRoom(room.code,player.id,"host");
 
   } catch(error) {
-    status("สร้างห้องไม่สำเร็จ\n" + error.message,"error");
+
+    status(
+      "สร้างห้องไม่สำเร็จ\n" + error.message,
+      "error"
+    );
+
   } finally {
     setBusy(false);
   }
 }
 
+/* =================================
+   JOIN ROOM
+================================= */
+
 async function joinRoom() {
 
-  if(busy) return;
+  if (busy) return;
 
-  const code = $("roomCode").value.trim().toUpperCase();
+  const code =
+    $("roomCode").value.trim().toUpperCase();
 
-  if(!/^[A-Z0-9]{6}$/.test(code)) {
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
     status("กรุณากรอกรหัสห้องให้ครบ 6 ตัว","error");
     return;
   }
 
   setBusy(true);
   closeSocket();
+  resetPlayers();
+
+  activeRoomCode = "";
+  activePlayerId = "";
+  gameStarted = false;
 
   status("กำลังเข้าร่วมห้อง " + code + "...");
 
@@ -463,31 +557,52 @@ async function joinRoom() {
 
     const data = await response.json();
 
-    if(!response.ok || !data.playerId) {
-      throw new Error(data.error || "ไม่สามารถเข้าร่วมห้องได้");
+    if (!response.ok || !data.playerId) {
+      throw new Error(
+        data.error || "ไม่สามารถเข้าร่วมห้องได้"
+      );
     }
 
     activeRoomCode = code;
     activePlayerId = data.playerId;
 
-    $("roomCodeDisplay").textContent = code;
-    $("codeBox").hidden = false;
+    savePlayerId(code,data.playerId);
 
-    try {
-      localStorage.setItem(
-        "br2-player-" + code,
-        data.playerId
-      );
-    } catch(e) {}
+    showRoomCode(code);
 
     connectRoom(code,data.playerId,"guest");
 
   } catch(error) {
-    status("เข้าร่วมห้องไม่สำเร็จ\n" + error.message,"error");
+
+    status(
+      "เข้าร่วมห้องไม่สำเร็จ\n" + error.message,
+      "error"
+    );
+
   } finally {
     setBusy(false);
   }
 }
+
+/* =================================
+   LOCAL PLAYER DATA
+================================= */
+
+function savePlayerId(code,id) {
+  try {
+    localStorage.setItem("br2-player-" + code,id);
+  } catch(error) {}
+}
+
+function showRoomCode(code) {
+  $("roomCode").value = code;
+  $("roomCodeDisplay").textContent = code;
+  $("codeBox").hidden = false;
+}
+
+/* =================================
+   WEBSOCKET
+================================= */
 
 function connectRoom(code,playerId,role) {
 
@@ -505,92 +620,336 @@ function connectRoom(code,playerId,role) {
 
   ws.onopen = () => {
 
-    if(socket !== ws) return;
+    if (socket !== ws) return;
 
     status(
       "เชื่อมต่อห้องสำเร็จ\n" +
       "รหัสห้อง: " + code + "\n" +
-      "บทบาท: " + (role === "host" ? "เจ้าของห้อง" : "ผู้เข้าร่วม") +
-      "\nรอข้อมูลผู้เล่น...",
+      "บทบาท: " +
+      (role === "host" ? "เจ้าของห้อง" : "ผู้เข้าร่วม") +
+      "\nกำลังตรวจสอบผู้เล่น...",
       "ok"
     );
   };
 
   ws.onmessage = event => {
 
-    if(socket !== ws) return;
+    if (socket !== ws) return;
 
     try {
 
       const data = JSON.parse(event.data);
 
-      if(data.type === "state" && data.room) {
+      /* ROOM STATE */
+
+      if (data.type === "state" && data.room) {
 
         const room = data.room;
         const players = room.players || [];
 
-        $("player1").textContent =
-          players[0] ? players[0].name : "รอผู้เล่น";
+        updatePlayers(players);
 
-        $("player2").textContent =
-          players[1] ? players[1].name : "รอผู้เล่น";
+        const ready =
+          players.length === 2 &&
+          room.status === "ready";
 
-        $("player1").className =
-          players[0] ? "online" : "waiting";
+        $("startGameBtn").disabled =
+          !ready || gameStarted;
 
-        $("player2").className =
-          players[1] ? "online" : "waiting";
+        $("startGameBtn").textContent =
+          ready
+            ? "🥊 เริ่มเกมออนไลน์"
+            : "🔒 รอผู้เล่นครบ 2 คน";
+
+        $("startInfo").textContent =
+          ready
+            ? "ผู้เล่นครบแล้ว พร้อมเริ่มเกม"
+            : "กำลังรอผู้เล่นอีกคน";
 
         status(
           "● เชื่อมต่อห้องแล้ว\n" +
           "รหัสห้อง: " + room.code + "\n" +
           "สถานะ: " + room.status + "\n" +
-          "ผู้เล่น: " + players.length + "/2 คน\n" +
-          (room.status === "ready"
-            ? "ผู้เล่นครบแล้ว พร้อมทดสอบระบบต่อไป"
-            : "กำลังรอผู้เล่นอีกคน"),
+          "ผู้เล่น: " + players.length + "/2 คน",
           "ok"
         );
 
-      } else if(data.type === "error") {
+        // กรณีผู้เล่นเชื่อมต่อช้ากว่า
+        if (room.startedAt) {
+          receiveStart(room.startedAt);
+        }
 
-        status("Worker แจ้งข้อผิดพลาด\n" + data.message,"error");
+      }
+
+      /* START SIGNAL */
+
+      else if (data.type === "start") {
+
+        receiveStart(
+          data.startedAt || data.room?.startedAt
+        );
+
+      }
+
+      /* SERVER ERROR */
+
+      else if (data.type === "error") {
+
+        status(
+          "Worker แจ้งข้อผิดพลาด\n" +
+          data.message,
+          "error"
+        );
 
       }
 
     } catch(error) {
-      status("ได้รับข้อมูลจากห้อง แต่ไม่สามารถอ่านข้อมูลได้","error");
+
+      console.error(error);
+
+      status(
+        "ไม่สามารถอ่านข้อมูลจากห้องได้",
+        "error"
+      );
     }
   };
 
   ws.onerror = () => {
 
-    if(socket !== ws) return;
+    if (socket !== ws) return;
 
     status(
-      "เชื่อมต่อห้องแล้ว แต่ WebSocket เกิดข้อผิดพลาด",
+      "WebSocket เกิดข้อผิดพลาด",
       "error"
     );
   };
 
   ws.onclose = () => {
 
-    if(socket !== ws) return;
+    if (socket !== ws) return;
 
-    status("การเชื่อมต่อห้องสิ้นสุดแล้ว");
     socket = null;
+
+    if (!gameStarted) {
+      status("การเชื่อมต่อห้องสิ้นสุดแล้ว");
+    }
   };
 }
 
-async function copyCode() {
+/* =================================
+   UPDATE PLAYERS
+================================= */
 
-  if(!activeRoomCode) return;
+function updatePlayers(players) {
+
+  $("player1").textContent =
+    players[0]?.name || "รอผู้เล่น";
+
+  $("player2").textContent =
+    players[1]?.name || "รอผู้เล่น";
+
+  $("player1").className =
+    players[0] ? "online" : "waiting";
+
+  $("player2").className =
+    players[1] ? "online" : "waiting";
+}
+
+function resetPlayers() {
+
+  $("player1").textContent = "รอผู้เล่น";
+  $("player2").textContent = "รอผู้เล่น";
+
+  $("player1").className = "waiting";
+  $("player2").className = "waiting";
+
+  $("startGameBtn").disabled = true;
+  $("startGameBtn").textContent =
+    "🔒 รอผู้เล่นครบ 2 คน";
+
+}
+
+/* =================================
+   START ONLINE GAME
+================================= */
+
+async function startOnlineGame() {
+
+  if (
+    busy ||
+    gameStarted ||
+    !activeRoomCode ||
+    !activePlayerId ||
+    !socket ||
+    socket.readyState !== WebSocket.OPEN
+  ) {
+    return;
+  }
+
+  const playersReady =
+    $("player1").classList.contains("online") &&
+    $("player2").classList.contains("online");
+
+  if (!playersReady) {
+    status("ต้องมีผู้เล่นครบ 2 คนก่อนเริ่มเกม","error");
+    return;
+  }
+
+  busy = true;
+
+  $("startGameBtn").disabled = true;
+  $("startGameBtn").textContent = "กำลังเริ่มเกม...";
+
+  status("กำลังส่งสัญญาณเริ่มเกมไปยังผู้เล่นทั้งสอง...");
 
   try {
 
-    await navigator.clipboard.writeText(activeRoomCode);
+    const response = await fetch(
+      API + "/room/" +
+      encodeURIComponent(activeRoomCode) +
+      "/start",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          playerId:activePlayerId
+        })
+      }
+    );
 
-    status("คัดลอกรหัสห้อง " + activeRoomCode + " แล้ว","ok");
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data.error || "ไม่สามารถเริ่มเกมได้"
+      );
+    }
+
+    // ไม่เปลี่ยนหน้าเอง
+    // รอ WebSocket ส่งสัญญาณ start
+    // เพื่อให้ทั้งสองเครื่องเข้าสู่เกมจากสัญญาณเดียวกัน
+
+    status(
+      "ได้รับคำสั่งเริ่มเกมแล้ว\nกำลังรอสัญญาณจากห้อง...",
+      "ok"
+    );
+
+    if (data.startedAt) {
+      receiveStart(data.startedAt);
+    }
+
+  } catch(error) {
+
+    busy = false;
+
+    $("startGameBtn").disabled = false;
+    $("startGameBtn").textContent =
+      "🥊 เริ่มเกมออนไลน์";
+
+    status(
+      "เริ่มเกมไม่สำเร็จ\n" + error.message,
+      "error"
+    );
+  }
+}
+
+/* =================================
+   RECEIVE START SIGNAL
+================================= */
+
+function receiveStart(startedAt) {
+
+  if (gameStarted || !activeRoomCode || !activePlayerId) {
+    return;
+  }
+
+  const startTime = Number(startedAt);
+
+  if (!Number.isFinite(startTime)) {
+    status("ข้อมูลเวลาเริ่มเกมไม่ถูกต้อง","error");
+    return;
+  }
+
+  gameStarted = true;
+
+  $("startGameBtn").disabled = true;
+  $("startGameBtn").textContent =
+    "กำลังเข้าสู่เกม...";
+
+  status(
+    "🥊 ผู้เล่นครบแล้ว!\n" +
+    "กำลังเตรียมเข้าสู่ Bloody Roar 2...",
+    "ok"
+  );
+
+  const delay = Math.max(
+    0,
+    Math.min(startTime - Date.now(),10000)
+  );
+
+  clearTimeout(launchTimer);
+
+  launchTimer = setTimeout(
+    launchFix6,
+    delay
+  );
+}
+
+/* =================================
+   LAUNCH FIX6
+================================= */
+
+function launchFix6() {
+
+  const gameURL = new URL(
+    FIX6,
+    window.location.href
+  );
+
+  gameURL.searchParams.set(
+    "room",
+    activeRoomCode
+  );
+
+  gameURL.searchParams.set(
+    "playerId",
+    activePlayerId
+  );
+
+  gameURL.searchParams.set(
+    "worker",
+    API
+  );
+
+  gameURL.searchParams.set(
+    "online",
+    "1"
+  );
+
+  window.location.href = gameURL.toString();
+}
+
+/* =================================
+   COPY ROOM CODE
+================================= */
+
+async function copyCode() {
+
+  if (!activeRoomCode) return;
+
+  try {
+
+    await navigator.clipboard.writeText(
+      activeRoomCode
+    );
+
+    status(
+      "คัดลอกรหัสห้อง " +
+      activeRoomCode + " แล้ว",
+      "ok"
+    );
 
   } catch(error) {
 
@@ -602,36 +961,120 @@ async function copyCode() {
   }
 }
 
+/* =================================
+   DISCONNECT
+================================= */
+
 function closeSocket() {
 
-  if(socket) {
+  if (socket) {
+
     const oldSocket = socket;
     socket = null;
+
     oldSocket.close();
   }
 }
 
-function disconnectRoom() {
+async function disconnectRoom() {
+
+  clearTimeout(launchTimer);
+
+  const code = activeRoomCode;
+  const playerId = activePlayerId;
 
   closeSocket();
 
   activeRoomCode = "";
   activePlayerId = "";
+  busy = false;
+  gameStarted = false;
+
+  if (code && playerId) {
+
+    try {
+
+      await fetch(
+        API + "/room/" +
+        encodeURIComponent(code) +
+        "/leave",
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            playerId
+          })
+        }
+      );
+
+    } catch(error) {
+      console.error(error);
+    }
+  }
 
   $("codeBox").hidden = true;
 
-  $("player1").textContent = "รอผู้เล่น";
-  $("player2").textContent = "รอผู้เล่น";
+  resetPlayers();
 
-  $("player1").className = "waiting";
-  $("player2").className = "waiting";
-
-  status("ออกจากการเชื่อมต่อห้องแล้ว");
+  status("ออกจากห้องแล้ว");
 }
 
-window.addEventListener("load",checkServer);
+/* =================================
+   EVENTS
+================================= */
 
-window.addEventListener("beforeunload",closeSocket);
+$("createBtn").addEventListener(
+  "click",
+  createRoom
+);
+
+$("joinBtn").addEventListener(
+  "click",
+  joinRoom
+);
+
+$("startGameBtn").addEventListener(
+  "click",
+  startOnlineGame
+);
+
+$("copyBtn").addEventListener(
+  "click",
+  copyCode
+);
+
+$("checkBtn").addEventListener(
+  "click",
+  checkServer
+);
+
+$("disconnectBtn").addEventListener(
+  "click",
+  disconnectRoom
+);
+
+$("roomCode").addEventListener(
+  "input",
+  event => {
+    event.target.value =
+      event.target.value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g,"")
+        .slice(0,6);
+  }
+);
+
+window.addEventListener(
+  "load",
+  checkServer
+);
+
+window.addEventListener(
+  "beforeunload",
+  closeSocket
+);
 
 </script>
 
