@@ -3532,7 +3532,7 @@ try {
     var ng=null, curName='disc', curExt='chd', curFile=null, romId='disc', held={}, busy=false;
 
     // ---------- BR2 online input bridge (P1 = room creator, P2 = room joiner) ----------
-    var br2Online={socket:null,room:'',playerId:'',role:0,ready:false,worker:'https://br2-online-rooms.fukthefuk400.workers.dev',status:null,remoteHeld:{}};
+    var br2Online={socket:null,room:'',playerId:'',role:0,ready:false,worker:'https://br2-online-rooms.fukthefuk400.workers.dev',status:null,remoteHeld:{},startedAt:0,loadedStartedAt:0,stateLoadPromise:null};
     function br2Status(message,ok){
       var el=br2Online.status;
       if(!el){el=document.createElement('div');el.id='br2-online-status';el.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);max-width:min(58vw,260px);padding:7px 10px;border:1px solid #64748b;border-radius:9px;background:#101722eF;color:#f8fafc;font:12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none;text-align:right';document.body.appendChild(el);br2Online.status=el;}
@@ -3566,6 +3566,11 @@ try {
             br2Online.role=idx+1;br2Online.ready=players.length===2;
             var names=players.map(function(x){return x.name||'ผู้เล่น';});
             br2Status('ห้อง '+br2Online.room+' · คุณคือ P'+br2Online.role+' · '+players.length+'/2 คน'+(players.length===2?' · '+names.join(' / '):' · รออีกคน'),br2Online.ready);
+            // หากเริ่มเกมไปแล้วก่อน FIX6 เชื่อมต่อ ให้ตรวจ startedAt จาก state ด้วย
+            if(data.room.status==='starting'&&data.room.startedAt){br2BeginSavedGame(data.room.startedAt,data.stateUrl);}
+          }else if(data.type==='start'){
+            var stamp=Number(data.startedAt||(data.room&&data.room.startedAt)||0);
+            if(stamp)br2BeginSavedGame(stamp,data.stateUrl);
           }else if(data.type==='input'&&data.playerId!==br2Online.playerId&&br2Online.role&&ng){
             var remote=br2Online.role===1?2:1;var button=String(data.button||'');if(!/^(up|down|left|right|x|y|a|b|l|r|l2|r2|start|select|l_[xy]_(minus|plus)|r_[xy]_(minus|plus))$/.test(button))return;
             if(data.pressed){if(!br2Online.remoteHeld[button]){br2Online.remoteHeld[button]=true;try{ng.pressDown(button,remote);}catch(_){}}}
@@ -4120,6 +4125,43 @@ void main()
     async function robustLoadState(data){
       if(!ng) return; await ng.loadState(data); await wait(250);
       try{ ng.sendCommand('LOAD_STATE'); }catch(_){ }
+    }
+    // โหลดจุดเซฟกลางจาก R2 อัตโนมัติเมื่อทั้งสองเครื่องได้รับสถานะเริ่มเกม
+    async function br2BeginSavedGame(startedAt,statePath){
+      startedAt=Number(startedAt||0);
+      if(!startedAt||startedAt===br2Online.loadedStartedAt)return;
+      if(br2Online.stateLoadPromise)return br2Online.stateLoadPromise;
+      br2Online.startedAt=startedAt;
+      br2Online.stateLoadPromise=(async function(){
+        try{
+          br2Status('ห้อง '+br2Online.room+' · กำลังเตรียมจุดเซฟ…',false);
+          // ถ้ายังไม่ได้เปิด Emulator ให้เรียกเกมจากไฟล์ที่เก็บไว้ในเครื่องโดยอัตโนมัติ
+          if(!ng){
+            var storedId=await getStoredId();
+            var storedGame=storedId?await getStoredDiscs(storedId):null;
+            if(!storedGame||!storedGame.files||!storedGame.files.length){
+              throw new Error('เครื่องนี้ยังไม่มีไฟล์เกมที่บันทึกไว้ กรุณาโหลดเกม Bloody Roar 2 หนึ่งครั้งก่อน');
+            }
+            await resumeFromStored(storedId);
+          }
+          var deadline=Date.now()+120000;
+          while(!ng&&Date.now()<deadline){await wait(500);}
+          if(!ng)throw new Error('เปิด Emulator ไม่สำเร็จ กรุณาตรวจบันทึกข้อผิดพลาด');
+          var endpoint=new URL(statePath||'/game-state',br2Online.worker).href;
+          var response=await fetch(endpoint,{method:'GET',cache:'no-store'});
+          if(!response.ok){var detail=await response.text().catch(function(){return '';});throw new Error('ดาวน์โหลดจุดเซฟไม่สำเร็จ ('+response.status+') '+detail.slice(0,180));}
+          var bytes=new Uint8Array(await response.arrayBuffer());
+          if(!bytes.length)throw new Error('ไฟล์จุดเซฟว่างเปล่า');
+          await robustLoadState(bytes);
+          br2Online.loadedStartedAt=startedAt;
+          br2Status('ห้อง '+br2Online.room+' · โหลดจุดเซฟแล้ว · คุณคือ P'+(br2Online.role||'?'),true);
+          try{log('โหลดจุดเซฟกลางสำเร็จ ('+(bytes.length/1048576).toFixed(2)+' MB)','ok');}catch(_){}
+        }catch(err){
+          br2Status('ออนไลน์: '+(err&&err.message||'โหลดจุดเซฟไม่สำเร็จ'),false);
+          try{showLog();log('โหลดจุดเซฟกลาง: '+(err&&err.message||err),'err');}catch(_){}
+        }finally{br2Online.stateLoadPromise=null;}
+      })();
+      return br2Online.stateLoadPromise;
     }
     // Sauvegarde d'état ROBUSTE : réessaie une fois si un « fs timeout » transitoire survient
     // (le core met parfois un peu à écrire le fichier au tout premier save d'une session).
