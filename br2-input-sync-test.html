@@ -201,6 +201,7 @@ function sendInput(button,action){
   return;
  }
 
+log("กำลังส่งปุ่ม "+button+" : "+action);
  ws.send(JSON.stringify({
   type:"input",
   playerId:myId,
