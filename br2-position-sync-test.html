@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10131a">
-<title>BR2 Network Movement V3</title>
+<title>BR2 Network Movement V4</title>
 
 <style>
 *{box-sizing:border-box}
@@ -18,7 +18,6 @@ body{
 }
 
 main{max-width:680px;margin:18px auto}
-
 h1{font-size:25px}
 p{color:#aeb7c6;line-height:1.55}
 
@@ -137,11 +136,11 @@ button.secondary{background:#394354}
 <body>
 <main>
 
-<h1>BR2 Network Movement V3</h1>
+<h1>BR2 Network Movement V4</h1>
 
 <p>
-ระบบ Multiplayer พร้อม Instant Direction,
-Stop Sync, Direction Prediction และ Smooth Correction
+ระบบ Multiplayer พร้อม Smooth Interpolation,
+Position Buffer และ Stop Sync
 </p>
 
 <label>รหัสห้อง</label>
@@ -243,9 +242,12 @@ let lastFrame=0;
 
 const SPEED=32;
 const SEND_RATE=50;
-const MAX_PREDICTION=80;
-const MAX_REMOTE_SPEED=65;
-const CORRECTION_SPEED=20;
+
+// เวลาหน่วงของ Buffer เพื่อช่วยให้ตำแหน่งต่อเนื่อง
+const INTERPOLATION_DELAY=100;
+
+// จำนวนตำแหน่งสูงสุดที่เก็บต่อผู้เล่น
+const MAX_SNAPSHOTS=30;
 
 function log(s){
 
@@ -255,38 +257,15 @@ function log(s){
 
 }
 
-function getPosition(id){
-
- return positions[id]||{x:25,y:50};
-
-}
-
 function clamp(v,min,max){
 
  return Math.max(min,Math.min(max,v));
 
 }
 
-function directionVelocity(dir){
+function getPosition(id){
 
- switch(dir){
-
-  case "left":
-   return {vx:-SPEED,vy:0};
-
-  case "right":
-   return {vx:SPEED,vy:0};
-
-  case "up":
-   return {vx:0,vy:-SPEED};
-
-  case "down":
-   return {vx:0,vy:SPEED};
-
-  default:
-   return {vx:0,vy:0};
-
- }
+ return positions[id]||{x:25,y:50};
 
 }
 
@@ -310,91 +289,137 @@ function sendPosition(){
 
 }
 
+// รับตำแหน่งจริงจากอีกเครื่องและเก็บลง Buffer
+
 function receivePosition(d){
 
  if(d.playerId===myId)return;
 
  const id=d.playerId;
+
+ const x=Number(d.x);
+ const y=Number(d.y);
+
+ if(!Number.isFinite(x)||!Number.isFinite(y))return;
+
  const now=performance.now();
 
  const next={
-  x:clamp(Number(d.x),3,97),
-  y:clamp(Number(d.y),7,93)
+  x:clamp(x,3,97),
+  y:clamp(y,7,93),
+  time:now
  };
-
- if(!Number.isFinite(next.x)||!Number.isFinite(next.y))return;
 
  const dir=[
   "left","right","up","down","stop"
  ].includes(d.direction)?d.direction:null;
 
- const old=remote[id];
+ if(!remote[id]){
+  remote[id]=[];
+ }
 
- if(!old){
+ const buffer=remote[id];
 
-  const velocity=directionVelocity(dir);
+ // ป้องกันข้อมูลเก่ากว่าตำแหน่งล่าสุด
+ if(buffer.length){
 
-  remote[id]={
+  const last=buffer[buffer.length-1];
 
-   x:next.x,
-   y:next.y,
+  if(now<=last.time)return;
 
-   vx:velocity.vx,
-   vy:velocity.vy,
+ }
 
-   time:now,
-   snap:true
+ buffer.push(next);
 
-  };
-
- }else{
-
-  const directionChanged=
-   dir!==null&&directions[id]!==dir;
-
-  const dt=(now-old.time)/1000;
-
-  if(dir!==null){
-
-   const velocity=directionVelocity(dir);
-
-   old.vx=velocity.vx;
-   old.vy=velocity.vy;
-
-  }else if(dt>0.005){
-
-   let vx=(next.x-old.x)/dt;
-   let vy=(next.y-old.y)/dt;
-
-   const speed=Math.hypot(vx,vy);
-
-   if(speed>MAX_REMOTE_SPEED){
-
-    const scale=MAX_REMOTE_SPEED/speed;
-
-    vx*=scale;
-    vy*=scale;
-
-   }
-
-   old.vx=vx;
-   old.vy=vy;
-
-  }
-
-  old.x=next.x;
-  old.y=next.y;
-  old.time=now;
-
-  if(directionChanged){
-   old.snap=true;
-  }
-
+ // จำกัดขนาด Buffer
+ while(buffer.length>MAX_SNAPSHOTS){
+  buffer.shift();
  }
 
  if(dir!==null){
   directions[id]=dir;
  }
+
+}
+
+// คำนวณตำแหน่งระหว่างข้อมูลสองจุด
+
+function interpolatePosition(id,renderTime){
+
+ const buffer=remote[id];
+
+ if(!buffer||buffer.length===0)return null;
+
+ // ลบข้อมูลที่เก่ากว่าเวลาที่ต้องแสดง
+ while(
+  buffer.length>2&&
+  buffer[1].time<renderTime
+ ){
+  buffer.shift();
+ }
+
+ // หากมีข้อมูลเพียงจุดเดียว ให้ใช้จุดนั้น
+ if(buffer.length===1){
+
+  return {
+   x:buffer[0].x,
+   y:buffer[0].y
+  };
+
+ }
+
+ // หาจุดสองจุดที่คร่อมเวลาแสดงผล
+ for(let i=0;i<buffer.length-1;i++){
+
+  const a=buffer[i];
+  const b=buffer[i+1];
+
+  if(renderTime>=a.time&&renderTime<=b.time){
+
+   const duration=b.time-a.time;
+
+   if(duration<=0){
+
+    return {x:b.x,y:b.y};
+
+   }
+
+   const t=clamp(
+    (renderTime-a.time)/duration,
+    0,
+    1
+   );
+
+   return {
+
+    x:a.x+(b.x-a.x)*t,
+
+    y:a.y+(b.y-a.y)*t
+
+   };
+
+  }
+
+ }
+
+ // เวลายังเก่ากว่าข้อมูลแรก
+ if(renderTime<buffer[0].time){
+
+  return {
+   x:buffer[0].x,
+   y:buffer[0].y
+  };
+
+ }
+
+ // ไม่มีข้อมูลอนาคตมารองรับ
+ // ใช้ตำแหน่งล่าสุดโดยไม่คาดการณ์ต่อ
+ const last=buffer[buffer.length-1];
+
+ return {
+  x:last.x,
+  y:last.y
+ };
 
 }
 
@@ -604,7 +629,6 @@ function startMove(dir){
  });
 
  // ส่งทิศทางใหม่ทันที
-
  sendPosition();
 
 }
@@ -623,8 +647,7 @@ function stopMove(){
 
   directions[myId]="stop";
 
-  // ส่งตำแหน่งและคำสั่งหยุดทันที
-
+  // ส่งตำแหน่งหยุดทันที
   sendPosition();
 
  }
@@ -666,45 +689,19 @@ function movementLoop(time){
 
  }
 
- // REMOTE PREDICTION + SMOOTH CORRECTION
+ // REMOTE INTERPOLATION
+
+ const renderTime=performance.now()-INTERPOLATION_DELAY;
 
  Object.keys(remote).forEach(id=>{
 
-  const r=remote[id];
+  const p=interpolatePosition(id,renderTime);
 
-  const age=Math.min(
-   (performance.now()-r.time)/1000,
-   MAX_PREDICTION/1000
-  );
-
-  const predictedX=clamp(r.x+r.vx*age,3,97);
-  const predictedY=clamp(r.y+r.vy*age,7,93);
-
-  const current=positions[id];
-
-  // ทิศทางเปลี่ยน: ปรับตำแหน่งทันที
-
-  if(r.snap||!current){
+  if(p){
 
    positions[id]={
-    x:predictedX,
-    y:predictedY
-   };
-
-   r.snap=false;
-
-  }else{
-
-   // แก้ตำแหน่งอย่างนุ่มนวล
-
-   const factor=1-Math.exp(-CORRECTION_SPEED*dt);
-
-   positions[id]={
-
-    x:current.x+(predictedX-current.x)*factor,
-
-    y:current.y+(predictedY-current.y)*factor
-
+    x:clamp(p.x,3,97),
+    y:clamp(p.y,7,93)
    };
 
   }
