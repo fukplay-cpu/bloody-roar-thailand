@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' https://br2-upload-gateway.fukthefuk400.workers.dev blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' https://br2-upload-gateway.fukthefuk400.workers.dev https://br2-online-rooms.fukthefuk400.workers.dev wss://br2-online-rooms.fukthefuk400.workers.dev blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3530,6 +3530,54 @@ try {
         logEl=document.getElementById('log')||mklog();
     function mklog(){ var d=document.createElement('div'); d.id='log'; document.body.appendChild(d); return d; }
     var ng=null, curName='disc', curExt='chd', curFile=null, romId='disc', held={}, busy=false;
+
+    // ---------- BR2 online input bridge (P1 = room creator, P2 = room joiner) ----------
+    var br2Online={socket:null,room:'',playerId:'',role:0,ready:false,worker:'https://br2-online-rooms.fukthefuk400.workers.dev',status:null,remoteHeld:{}};
+    function br2Status(message,ok){
+      var el=br2Online.status;
+      if(!el){el=document.createElement('div');el.id='br2-online-status';el.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);max-width:min(58vw,260px);padding:7px 10px;border:1px solid #64748b;border-radius:9px;background:#101722eF;color:#f8fafc;font:12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none;text-align:right';document.body.appendChild(el);br2Online.status=el;}
+      el.textContent=message;el.style.borderColor=ok?'#22c55e':'#64748b';el.style.color=ok?'#86efac':'#f8fafc';
+    }
+    function br2Send(data){var ws=br2Online.socket;if(ws&&ws.readyState===WebSocket.OPEN){try{ws.send(JSON.stringify(data));return true;}catch(_){}}return false;}
+    function br2Input(button,pressed){
+      if(!ng)return;
+      var local=br2Online.role===2?2:1;
+      try{pressed?ng.pressDown(button,local):ng.pressUp(button,local);}catch(_){ }
+      if(br2Online.role)br2Send({type:'input',playerId:br2Online.playerId,button:String(button),pressed:!!pressed});
+    }
+    function br2ReleaseRemote(){
+      if(!ng)return;var other=br2Online.role===1?2:1;
+      Object.keys(br2Online.remoteHeld).forEach(function(k){try{ng.pressUp(k,other);}catch(_){}});
+      br2Online.remoteHeld={};
+    }
+    function br2ConnectFromUrl(){
+      var q;try{q=new URLSearchParams(location.search);}catch(_){return;}
+      if(q.get('online')!=='1')return;
+      br2Online.room=(q.get('room')||'').toUpperCase();br2Online.playerId=q.get('playerId')||'';br2Online.worker=q.get('worker')||br2Online.worker;
+      if(!/^[A-Z0-9]{6}$/.test(br2Online.room)||!br2Online.playerId){br2Status('ออนไลน์: ลิงก์ห้องไม่สมบูรณ์',false);return;}
+      var wsUrl;try{var u=new URL(br2Online.worker);u.protocol=u.protocol==='http:'?'ws:':'wss:';u.pathname='/room/'+br2Online.room+'/ws';u.search='';u.searchParams.set('playerId',br2Online.playerId);u.hash='';wsUrl=u.href;}catch(_){br2Status('ออนไลน์: URL เซิร์ฟเวอร์ไม่ถูกต้อง',false);return;}
+      br2Status('ห้อง '+br2Online.room+' · กำลังเชื่อมต่อ…',false);
+      try{var ws=new WebSocket(wsUrl);br2Online.socket=ws;
+        ws.onopen=function(){br2Status('ห้อง '+br2Online.room+' · เชื่อมต่อแล้ว รอตรวจสอบตำแหน่ง',false);};
+        ws.onmessage=function(ev){var data;try{data=JSON.parse(ev.data);}catch(_){return;}
+          if(data.type==='state'&&data.room){var players=Array.isArray(data.room.players)?data.room.players:[];var idx=players.findIndex(function(x){return x&&x.id===br2Online.playerId;});
+            if(idx<0){br2Online.role=0;br2Online.ready=false;br2Status('ห้อง '+br2Online.room+' · ไม่พบผู้เล่นในห้อง',false);return;}
+            // Seat is permanent by room order: creator at index 0 = P1; joiner at index 1 = P2.
+            br2Online.role=idx+1;br2Online.ready=players.length===2;
+            var names=players.map(function(x){return x.name||'ผู้เล่น';});
+            br2Status('ห้อง '+br2Online.room+' · คุณคือ P'+br2Online.role+' · '+players.length+'/2 คน'+(players.length===2?' · '+names.join(' / '):' · รออีกคน'),br2Online.ready);
+          }else if(data.type==='input'&&data.playerId!==br2Online.playerId&&br2Online.role&&ng){
+            var remote=br2Online.role===1?2:1;var button=String(data.button||'');if(!/^(up|down|left|right|x|y|a|b|l|r|l2|r2|start|select|l_[xy]_(minus|plus)|r_[xy]_(minus|plus))$/.test(button))return;
+            if(data.pressed){if(!br2Online.remoteHeld[button]){br2Online.remoteHeld[button]=true;try{ng.pressDown(button,remote);}catch(_){}}}
+            else if(br2Online.remoteHeld[button]){delete br2Online.remoteHeld[button];try{ng.pressUp(button,remote);}catch(_){}}
+          }else if(data.type==='error'){br2Status('ออนไลน์: '+(data.message||'เกิดข้อผิดพลาด'),false);}
+        };
+        ws.onerror=function(){br2Status('ห้อง '+br2Online.room+' · เชื่อมต่อผิดพลาด',false);};
+        ws.onclose=function(){br2Online.ready=false;br2ReleaseRemote();br2Status('ห้อง '+br2Online.room+' · หลุดการเชื่อมต่อ',false);};
+      }catch(e){br2Status('ออนไลน์: '+(e.message||'เปิดการเชื่อมต่อไม่ได้'),false);}
+    }
+    window.addEventListener('beforeunload',function(){try{if(br2Online.socket)br2Online.socket.close();}catch(_){}});
+    br2ConnectFromUrl();
     var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
     var CONTENT_DIR='/home/web_user/retroarch/userdata/content';
     var CFG_PATH='/home/web_user/retroarch/userdata/retroarch.cfg';
@@ -3887,7 +3935,7 @@ void main()
     var dpadEl=null, dpadPointer=null, dpadDirs={up:false,down:false,left:false,right:false};
     var stickCtl={};
     function makeStick(el,pfx){ if(!el) return null; var knob=el.querySelector('.knob'); var pid=null, act={};
-      function set(name,on){ var k=pfx+'_'+name; if(act[k]===on) return; act[k]=on; try{ if(ng){ on?ng.pressDown(k):ng.pressUp(k); } }catch(_){ } }
+      function set(name,on){ var k=pfx+'_'+name; if(act[k]===on) return; act[k]=on; try{ if(ng){ br2Input(k,on); } }catch(_){ } }
       function upd(e){ var r=el.getBoundingClientRect(); var nx=(e.clientX-(r.left+r.width/2))/(r.width/2), ny=(e.clientY-(r.top+r.height/2))/(r.height/2); var m=Math.hypot(nx,ny); if(m>1){nx/=m;ny/=m;}
         knob.style.left=(50+nx*32)+'%'; knob.style.top=(50+ny*32)+'%'; var dz=0.34;
         set('x_minus',nx<-dz); set('x_plus',nx>dz); set('y_minus',ny<-dz); set('y_plus',ny>dz); }
@@ -3898,7 +3946,7 @@ void main()
       el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); el.addEventListener('lostpointercapture',end);
       return {reset:reset};
     }
-    function pressDir(dir,on){ if(dpadDirs[dir]===on) return; dpadDirs[dir]=on; try{ if(ng){ on?ng.pressDown(dir):ng.pressUp(dir); } }catch(_){ } if(dpadEl){ var a=dpadEl.querySelector('.ar.'+dir[0]); if(a) a.classList.toggle('on',on); } }
+    function pressDir(dir,on){ if(dpadDirs[dir]===on) return; dpadDirs[dir]=on; try{ if(ng){ br2Input(dir,on); } }catch(_){ } if(dpadEl){ var a=dpadEl.querySelector('.ar.'+dir[0]); if(a) a.classList.toggle('on',on); } }
     function updateDpad(e){ if(!dpadEl) return; var r=dpadEl.getBoundingClientRect(); var nx=(e.clientX-r.left)/r.width*2-1, ny=(e.clientY-r.top)/r.height*2-1; var dead=(Math.abs(nx)<0.28&&Math.abs(ny)<0.28); pressDir('left',!dead&&nx<-0.30); pressDir('right',!dead&&nx>0.30); pressDir('up',!dead&&ny<-0.30); pressDir('down',!dead&&ny>0.30); }
     function clearDpad(){ pressDir('up',false); pressDir('down',false); pressDir('left',false); pressDir('right',false); dpadPointer=null; }
     function buildPad(){
@@ -3914,8 +3962,8 @@ void main()
       var dend=function(e){ if(e.pointerId!==dpadPointer) return; clearDpad(); };
       dpadEl.addEventListener('pointerup',dend); dpadEl.addEventListener('pointercancel',dend); dpadEl.addEventListener('lostpointercapture',dend);
       Array.prototype.forEach.call(pad.querySelectorAll('button[data-btn]'), function(el){ var name=el.getAttribute('data-btn');
-        el.addEventListener('pointerdown',function(e){ e.preventDefault(); try{el.setPointerCapture(e.pointerId);}catch(_){ } el.classList.add('on'); held[name]=el; try{ if(ng) ng.pressDown(name); }catch(_){ } });
-        var rel=function(){ el.classList.remove('on'); delete held[name]; try{ if(ng) ng.pressUp(name); }catch(_){ } };
+        el.addEventListener('pointerdown',function(e){ e.preventDefault(); try{el.setPointerCapture(e.pointerId);}catch(_){ } el.classList.add('on'); held[name]=el; try{ if(ng) br2Input(name,true); }catch(_){ } });
+        var rel=function(){ el.classList.remove('on'); delete held[name]; try{ if(ng) br2Input(name,false); }catch(_){ } };
         el.addEventListener('pointerup',rel); el.addEventListener('pointercancel',rel); el.addEventListener('lostpointercapture',rel);
       });
       stickCtl.l=makeStick(document.getElementById('stickL'),'l'); stickCtl.r=makeStick(document.getElementById('stickR'),'r');
@@ -4024,7 +4072,7 @@ void main()
     }
     installEditorPanelDrag();
     loadPadLayout();installPadDrag();
-    function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng)ng.pressUp(n); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
+    function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng)br2Input(n,false); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
     window.addEventListener('blur',releaseAll); document.addEventListener('visibilitychange',function(){ if(document.hidden) releaseAll(); });
 
     var fitT=null;
