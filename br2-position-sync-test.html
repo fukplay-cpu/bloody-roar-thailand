@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#10131a">
-<title>BR2 Network Movement V2</title>
+<title>BR2 Network Movement V3</title>
 
 <style>
 *{box-sizing:border-box}
@@ -131,17 +131,17 @@ button.secondary{background:#394354}
  font:12px ui-monospace,monospace;
  white-space:pre-wrap;
 }
-
 </style>
 </head>
 
 <body>
 <main>
 
-<h1>BR2 Network Movement V2</h1>
+<h1>BR2 Network Movement V3</h1>
 
 <p>
-ระบบทดสอบ Multiplayer พร้อม Prediction และ Smooth Correction
+ระบบ Multiplayer พร้อม Instant Direction,
+Stop Sync, Direction Prediction และ Smooth Correction
 </p>
 
 <label>รหัสห้อง</label>
@@ -210,7 +210,7 @@ style="left:75%;top:50%">◀</div>
 </div>
 
 <p class="small">
-กดค้างเพื่อเดินต่อเนื่อง สามารถเปลี่ยนทิศทางได้ทันที
+กดค้างเพื่อเดินต่อเนื่อง เปลี่ยนทิศทางได้ทันที
 </p>
 
 </section>
@@ -234,7 +234,6 @@ let myId="";
 
 let positions={};
 let remote={};
-
 let directions={};
 
 let activeDirection=null;
@@ -246,6 +245,7 @@ const SPEED=32;
 const SEND_RATE=50;
 const MAX_PREDICTION=80;
 const MAX_REMOTE_SPEED=65;
+const CORRECTION_SPEED=20;
 
 function log(s){
 
@@ -267,6 +267,29 @@ function clamp(v,min,max){
 
 }
 
+function directionVelocity(dir){
+
+ switch(dir){
+
+  case "left":
+   return {vx:-SPEED,vy:0};
+
+  case "right":
+   return {vx:SPEED,vy:0};
+
+  case "up":
+   return {vx:0,vy:-SPEED};
+
+  case "down":
+   return {vx:0,vy:SPEED};
+
+  default:
+   return {vx:0,vy:0};
+
+ }
+
+}
+
 function sendPosition(){
 
  if(!ws||ws.readyState!==WebSocket.OPEN||!myId)return;
@@ -279,7 +302,7 @@ function sendPosition(){
   playerId:myId,
   x:p.x,
   y:p.y,
-  direction:directions[myId]||"right"
+  direction:directions[myId]||"stop"
 
  }));
 
@@ -292,7 +315,6 @@ function receivePosition(d){
  if(d.playerId===myId)return;
 
  const id=d.playerId;
-
  const now=performance.now();
 
  const next={
@@ -302,23 +324,44 @@ function receivePosition(d){
 
  if(!Number.isFinite(next.x)||!Number.isFinite(next.y))return;
 
+ const dir=[
+  "left","right","up","down","stop"
+ ].includes(d.direction)?d.direction:null;
+
  const old=remote[id];
 
  if(!old){
 
+  const velocity=directionVelocity(dir);
+
   remote[id]={
+
    x:next.x,
    y:next.y,
-   vx:0,
-   vy:0,
-   time:now
+
+   vx:velocity.vx,
+   vy:velocity.vy,
+
+   time:now,
+   snap:true
+
   };
 
  }else{
 
+  const directionChanged=
+   dir!==null&&directions[id]!==dir;
+
   const dt=(now-old.time)/1000;
 
-  if(dt>0.005){
+  if(dir!==null){
+
+   const velocity=directionVelocity(dir);
+
+   old.vx=velocity.vx;
+   old.vy=velocity.vy;
+
+  }else if(dt>0.005){
 
    let vx=(next.x-old.x)/dt;
    let vy=(next.y-old.y)/dt;
@@ -343,10 +386,14 @@ function receivePosition(d){
   old.y=next.y;
   old.time=now;
 
+  if(directionChanged){
+   old.snap=true;
+  }
+
  }
 
- if(d.direction){
-  directions[id]=d.direction;
+ if(dir!==null){
+  directions[id]=dir;
  }
 
 }
@@ -447,13 +494,18 @@ $("connect").onclick=()=>{
   return;
  }
 
- if(ws)ws.close();
-
  stopMove();
+
+ if(ws)ws.close();
 
  remote={};
  positions={};
  directions={};
+ room=null;
+ myId="";
+
+ $("player").innerHTML=
+ '<option value="">เชื่อมต่อเพื่อโหลดรายชื่อก่อน</option>';
 
  $("code").value=code;
  $("log").textContent="";
@@ -551,18 +603,31 @@ function startMove(dir){
   b.classList.toggle("active",b.dataset.move===dir);
  });
 
- // ส่งทิศทางทันทีเมื่อมีการเปลี่ยน
+ // ส่งทิศทางใหม่ทันที
+
  sendPosition();
 
 }
 
 function stopMove(){
 
+ const wasMoving=activeDirection!==null;
+
  activeDirection=null;
 
  document.querySelectorAll("[data-move]").forEach(b=>{
   b.classList.remove("active");
  });
+
+ if(wasMoving&&myId){
+
+  directions[myId]="stop";
+
+  // ส่งตำแหน่งและคำสั่งหยุดทันที
+
+  sendPosition();
+
+ }
 
 }
 
@@ -577,7 +642,7 @@ function movementLoop(time){
 
  if(!room)return;
 
- // การเคลื่อนที่ของผู้เล่นเครื่องนี้
+ // LOCAL MOVEMENT
 
  if(activeDirection&&myId&&ws&&ws.readyState===WebSocket.OPEN){
 
@@ -601,7 +666,7 @@ function movementLoop(time){
 
  }
 
- // คาดการณ์ตำแหน่งผู้เล่นอีกเครื่อง
+ // REMOTE PREDICTION + SMOOTH CORRECTION
 
  Object.keys(remote).forEach(id=>{
 
@@ -612,13 +677,37 @@ function movementLoop(time){
    MAX_PREDICTION/1000
   );
 
-  const predictedX=r.x+r.vx*age;
-  const predictedY=r.y+r.vy*age;
+  const predictedX=clamp(r.x+r.vx*age,3,97);
+  const predictedY=clamp(r.y+r.vy*age,7,93);
 
-  positions[id]={
-   x:clamp(predictedX,3,97),
-   y:clamp(predictedY,7,93)
-  };
+  const current=positions[id];
+
+  // ทิศทางเปลี่ยน: ปรับตำแหน่งทันที
+
+  if(r.snap||!current){
+
+   positions[id]={
+    x:predictedX,
+    y:predictedY
+   };
+
+   r.snap=false;
+
+  }else{
+
+   // แก้ตำแหน่งอย่างนุ่มนวล
+
+   const factor=1-Math.exp(-CORRECTION_SPEED*dt);
+
+   positions[id]={
+
+    x:current.x+(predictedX-current.x)*factor,
+
+    y:current.y+(predictedY-current.y)*factor
+
+   };
+
+  }
 
  });
 
@@ -627,6 +716,8 @@ function movementLoop(time){
 }
 
 requestAnimationFrame(movementLoop);
+
+// TOUCH CONTROLS
 
 document.querySelectorAll("[data-move]").forEach(b=>{
 
