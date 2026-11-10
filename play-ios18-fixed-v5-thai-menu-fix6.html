@@ -128,7 +128,7 @@
       <button data-act="editpad">ปรับแต่งปุ่มควบคุม</button>
       <button data-act="hd" id="btn-hd" title="เพิ่มความละเอียดภายใน 2 เท่า ภาพ 3 มิติคมชัดขึ้น แต่อาจใช้ประสิทธิภาพเครื่องมากขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">HD</button>
       <button data-act="savecurrent" class="primary">บันทึก</button>
-      <button data-act="resetgame" title="เริ่มเกมปัจจุบันใหม่จากหน้าเริ่มต้น">รีเซ็ทเกม</button>
+      <button data-act="resetgame" title="รีเฟรชตัวเกมโดยไม่โหลดหน้าเว็บใหม่ และคงการเชื่อมต่อออนไลน์ไว้">รีเฟรชเกม</button>
       <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
         <button data-act="dot1" id="btn-dot1" title="เปิด/ปิดฟิลเตอร์จุดภาพ (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ</button>
         <button data-act="dot2" id="btn-dot2" title="ฟิลเตอร์จุดภาพ 2 เท่า — จุดใหญ่ขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ 2×</button>
@@ -4715,12 +4715,32 @@ void main()
         if(act==='menu'){ var extra=document.getElementById('extra-menu'); extra.hidden=!extra.hidden; b.setAttribute('aria-expanded',String(!extra.hidden)); }
         else if(act==='savecurrent'){ if(!ng||!romId){ log('ยังไม่มีเกมที่กำลังเล่นให้บันทึก','muted'); } else { var saved=await robustSaveState(); await idbSet('state:'+romId, saved&&saved.state?saved.state:saved); histSet(romId,{hasState:true,stateTs:Date.now()}); log('บันทึกจุดเล่นปัจจุบันแล้ว — กด “เล่นต่อ” เพื่อกลับมาจุดนี้','ok'); } }
         else if(act==='resetgame'){
-          if(!ng){ log('ยังไม่มีเกมที่กำลังเล่นให้รีเซ็ท','muted'); }
-          else if(confirm('รีเซ็ทเกมกลับไปยังหน้าเริ่มต้นหรือไม่? ความคืบหน้าที่ยังไม่ได้กด “บันทึก” อาจสูญหาย')){
-            releaseAll();
-            ng.restart();
-            setTimeout(function(){ try{ fit(); canvas.focus(); }catch(_){ } },120);
-            log('รีเซ็ทเกมแล้ว กำลังเริ่มเกมใหม่จากหน้าเริ่มต้น','ok');
+          if(!ng){
+            log('ยังไม่มีเกมที่กำลังเล่นให้รีเฟรช','muted');
+          }else if(confirm('รีเฟรชตัวเกมหรือไม่? ระบบจะบันทึกตำแหน่งปัจจุบัน รีสตาร์ตตัวเกม แล้วกลับมาเล่นต่อจากจุดเดิม โดยไม่โหลดหน้าเว็บหรือหลุดจากห้องออนไลน์')){
+            // Soft refresh: restart เฉพาะ emulator/core ภายในหน้าเดิม
+            // ห้ามใช้ location.reload() เพราะจะปิด WebSocket และทำให้หลุดจากห้องออนไลน์
+            try{
+              // เก็บสถานะ ณ เฟรมปัจจุบันไว้ก่อน เพื่อกลับมาเล่นต่อจุดเดิมหลังรีสตาร์ต core
+              var refreshState=await robustSaveState();
+              releaseAll();
+              br2ReleaseRemote();
+              if(br2Online.role){
+                br2Status('ห้อง '+br2Online.room+' · กำลังรีเฟรชเกม (คงการเชื่อมต่อไว้)',false);
+              }
+              await ng.restart();
+              await wait(350);
+              await robustLoadState(refreshState);
+              setTimeout(function(){
+                try{ fit(); canvas.focus(); }catch(_){ }
+                if(br2Online.role && br2Online.socket && br2Online.socket.readyState===WebSocket.OPEN){
+                  br2Status('ห้อง '+br2Online.room+' · เชื่อมต่อแล้ว · คุณคือ P'+br2Online.role,true);
+                }
+              },150);
+              log('รีเฟรชเกมสำเร็จ — กลับมาเล่นต่อจากจุดเดิม และคงการเชื่อมต่อออนไลน์ไว้','ok');
+            }catch(resetErr){
+              log('รีเฟรชตัวเกมไม่สำเร็จ: '+(resetErr&&resetErr.message||resetErr),'err');
+            }
           }
         }
         else if(act==='loadrom'){ await clearMemAndReload(); }
