@@ -170,6 +170,7 @@ export default {
       return withCors(json({
         ok: true,
         service: "BR2 online rooms",
+        version: "git-builds-1",
         gameSaves: !!env.GAME_SAVES
       }), request);
     }
