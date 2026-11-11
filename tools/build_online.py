@@ -38,7 +38,7 @@ def patch_core(js):
     js = replace_once(
         js,
         "MainLoop.runIter(iterFunc);if(!checkIsRunning())return;MainLoop.scheduler()};",
-        "if(globalThis.__br2Gate&&!globalThis.__br2Gate()){setTimeout(MainLoop.runner,1);return}"
+        "if(globalThis.__br2Gate&&!globalThis.__br2Gate()){if(MainLoop.timingMode==1&&MainLoop.scheduler)MainLoop.scheduler();else setTimeout(MainLoop.runner,1);return}"
         "MainLoop.runIter(iterFunc);if(!checkIsRunning())return;MainLoop.scheduler()};",
         "main-loop gate",
     )

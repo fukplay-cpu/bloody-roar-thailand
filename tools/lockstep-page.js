@@ -3,7 +3,7 @@
     // ปุ่มของเราถูกหน่วงไว้ LS.delay เฟรม เพื่อให้มีเวลาส่งถึงอีกเครื่องก่อนถึงเฟรมนั้น
     window.__br2Lockstep=true;
     var br2Online={socket:null,room:'',playerId:'',role:0,ready:false,worker:'https://br2-online-rooms.fukthefuk400.workers.dev',status:null,remoteHeld:{},startedAt:0,loadedStartedAt:0,stateLoadPromise:null};
-    var LS={delay:4,RING:256,ws:null,B:null,sab:null,local:{},remote:{},sent:-1,avail:-1,started:false,myReady:false,peerFp:null,fp:'',rtt:0,lastPong:0,lastStall:0,stallMs:0,error:'',reconnectTimer:null,pumpTimer:null};
+    var LS={delay:4,fixedDelay:false,RING:256,ws:null,B:null,sab:null,local:{},remote:{},sent:-1,avail:-1,started:false,myReady:false,peerFp:null,fp:'',rtt:0,lastPong:0,lastStall:0,stallMs:0,error:'',reconnectTimer:null,pumpTimer:null};
     var LS_BTN=['up','down','left','right','a','b','x','y','l','r','l2','r2','start','select','l_x_minus','l_x_plus','l_y_minus','l_y_plus','r_x_minus','r_x_plus','r_y_minus','r_y_plus'];
     var lsHeld={}; window.__br2LS=LS;
     function br2Status(message,ok){
@@ -94,7 +94,9 @@
         if(d.t==='i'){ if(typeof d.f==='number'&&LS.remote[d.f]===undefined&&d.f>LS.avail) LS.remote[d.f]=d.b|0; lsPump(); }
         else if(d.t==='rdy'){ LS.peerFp=String(d.fp||''); if(d.ask) lsSendReady(false); lsTryStart(); lsShow(); }
         else if(d.t==='ping'){ lsSendRaw({t:'pong',p:br2Online.role,ts:d.ts}); }
-        else if(d.t==='pong'){ if(d.ts){ var r=performance.now()-d.ts; LS.rtt=LS.rtt?LS.rtt*0.7+r*0.3:r; LS.lastPong=Date.now(); } }
+        else if(d.t==='pong'){ if(d.ts){ var r=performance.now()-d.ts; LS.rtt=LS.rtt?LS.rtt*0.7+r*0.3:r; LS.lastPong=Date.now();
+            // ปรับค่าหน่วงอัตโนมัติตาม ping: ส่งทางเดียวใช้ ~rtt/2 → แปลงเป็นเฟรม + เผื่อ 2 เฟรม
+            if(!LS.fixedDelay){ var want=Math.min(15,Math.max(3,Math.ceil(LS.rtt/2/16.7)+2)); if(want>LS.delay||want<LS.delay-1) LS.delay=want; } } }
         return;
       }
       if(d.type==='state'&&d.room){
@@ -121,7 +123,7 @@
     function br2ConnectFromUrl(){
       var q; try{ q=new URLSearchParams(location.search); }catch(_){ return; }
       br2Online.room=(q.get('room')||'').toUpperCase(); br2Online.playerId=q.get('playerId')||''; br2Online.worker=q.get('worker')||br2Online.worker;
-      var dl=parseInt(q.get('delay')||'',10); if(dl>=1&&dl<=12) LS.delay=dl;
+      var dl=parseInt(q.get('delay')||'',10); if(dl>=1&&dl<=15){ LS.delay=dl; LS.fixedDelay=true; }
       if(!/^[A-Z0-9]{6}$/.test(br2Online.room)||!br2Online.playerId){ br2Status('หน้านี้สำหรับเล่นออนไลน์\nกรุณาเข้าผ่านหน้า "ห้องออนไลน์"',false); return; }
       lsConnect();
       LS.pumpTimer=setInterval(lsPump,4);
