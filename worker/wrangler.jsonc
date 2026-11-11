@@ -1,0 +1,15 @@
+{
+  // Cloudflare Worker สำหรับระบบห้องออนไลน์ BR2
+  // ติดตั้งอัตโนมัติผ่าน Workers Builds เมื่อมีการอัปโหลดขึ้น GitHub (Root directory: worker)
+  "name": "br2-online-rooms",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" }
+    ]
+  },
+  "r2_buckets": [
+    { "binding": "GAME_SAVES", "bucket_name": "br2-game-saves" }
+  ]
+}
