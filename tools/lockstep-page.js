@@ -84,9 +84,39 @@
         var PT=M&&M.__br2PThread, n=0;
         if(PT){ [].concat(PT.runningWorkers||[],PT.unusedWorkers||[]).forEach(function(w){ try{ w.postMessage({cmd:'br2lock',sab:LS.sab,codes:codes}); n++; }catch(_){ } }); }
         log('Lockstep: ผูกกับตัวเกมแล้ว (threads '+n+')','ok');
-        LS.fp=lsFingerprint(); LS.myReady=true; lsSendReady(true); lsTryStart(); lsShow();
+        // ระหว่างเตรียมจุดเซฟ ให้เกมเดินได้ตามปกติ (สถานะก่อนโหลดเซฟไม่มีผลกับเกม)
+        Atomics.store(LS.B,0,0);
+        lsPrepareSave(M);
       }catch(e){ LS.error='⚠️ '+(e&&e.message||e); try{ showLog(); log('Lockstep: '+LS.error,'err'); }catch(_){ } lsShow(); }
     };
+    function lsHash(u8){ var h=0x811c9dc5; for(var i=0;i<u8.length;i+=7){ h^=u8[i]; h=Math.imul(h,0x01000193); } return (h>>>0).toString(16)+':'+u8.length; }
+    function lsCmd(M,name){ try{ if(M&&typeof M[name]==='function'){ M[name](); return true; } }catch(_){ } return false; }
+    // โหลดจุดเซฟกลาง (หน้าเลือกตัวละคร 2P) ให้ตรงกันทุกเฟรม:
+    // 1) หยุดเกม  2) โหลดเซฟ (เครื่องไหนเสร็จก่อนก็ยังหยุดรอ)  3) ล็อกเฟรม  4) สั่งเล่นต่อ — คำสั่งเล่นต่อจะถูกใช้ในเฟรมแรกที่ปล่อยพร้อมกันทั้งสองเครื่อง
+    async function lsPrepareSave(M){
+      var saveTag='boot';
+      try{
+        br2Status('ห้อง '+br2Online.room+' · กำลังโหลดจุดเซฟ…',false);
+        if(!lsCmd(M,'_cmd_pause')) throw new Error('หยุดเกมชั่วคราวไม่ได้');
+        await wait(300);
+        var endpoint=new URL('/game-state',br2Online.worker).href;
+        var response=await fetch(endpoint,{method:'GET',cache:'no-store'});
+        if(!response.ok) throw new Error('ดาวน์โหลดจุดเซฟไม่สำเร็จ ('+response.status+')');
+        var bytes=new Uint8Array(await response.arrayBuffer());
+        if(!bytes.length) throw new Error('ไฟล์จุดเซฟว่างเปล่า');
+        await robustLoadState(bytes);
+        await wait(1500);
+        saveTag=lsHash(bytes);
+        log('Lockstep: โหลดจุดเซฟแล้ว ('+(bytes.length/1048576).toFixed(2)+' MB)','ok');
+      }catch(e){
+        // โหลดเซฟไม่ได้ → เริ่มจากหน้าแรกของเกมแทน (ทั้งสองเครื่องจะเห็นว่า fingerprint ต่างกันถ้าอีกเครื่องโหลดได้)
+        try{ showLog(); log('Lockstep: '+(e&&e.message||e)+' → เริ่มจากหน้าแรกของเกม','err'); }catch(_){ }
+      }
+      Atomics.store(LS.B,0,1);   // ล็อก: ห้ามเดินเฟรมจนกว่าทั้งสองเครื่องพร้อม
+      await wait(250);
+      lsCmd(M,'_cmd_unpause');   // รอใช้ในเฟรมแรกที่ปล่อย
+      LS.fp=lsFingerprint()+'|'+saveTag; LS.myReady=true; lsSendReady(true); lsTryStart(); lsShow();
+    }
     function lsOnMessage(ev){
       var d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
       if(d.t){
