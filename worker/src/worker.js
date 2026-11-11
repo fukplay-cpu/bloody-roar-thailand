@@ -99,6 +99,14 @@ export class Room {
     server.addEventListener("close", remove);
     server.addEventListener("error", remove);
     server.addEventListener("message", async event => {
+      // Lockstep netplay: ส่งต่อทันทีแบบไม่แตะ storage เพื่อความหน่วงต่ำที่สุด
+      // ข้อความ { t: "i" | "rdy" | "ping" | "pong" | "hash", ... }
+      if (typeof event.data === "string" && event.data.startsWith('{"t":"')) {
+        if (!socketPlayerId) return;
+        if (event.data.length > 2048) return;
+        this.relay(server, event.data);
+        return;
+      }
       let data;
       try {
         data = JSON.parse(
@@ -139,6 +147,16 @@ export class Room {
       webSocket: client
     });
   }
+  relay(from, message) {
+    for (const ws of this.sockets) {
+      if (ws === from) continue;
+      try {
+        ws.send(message);
+      } catch {
+        this.sockets.delete(ws);
+      }
+    }
+  }
   broadcast(data) {
     const message = JSON.stringify(data);
     for (const ws of this.sockets) {
@@ -170,7 +188,7 @@ export default {
       return withCors(json({
         ok: true,
         service: "BR2 online rooms",
-        version: "git-builds-1",
+        version: "lockstep-1",
         gameSaves: !!env.GAME_SAVES
       }), request);
     }
@@ -255,7 +273,8 @@ export default {
       const stub = env.ROOMS.get(id);
       const subpath = match[2] || "/state";
       const response = await stub.fetch(
-        "https://room.internal" + subpath,
+        // ต้องส่ง query (?playerId=...) ต่อไปด้วย ไม่งั้นห้องจะไม่รู้ว่าใครเชื่อมต่อ
+        "https://room.internal" + subpath + url.search,
         request
       );
       if (response.status === 101 || response.webSocket) {
