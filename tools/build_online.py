@@ -15,6 +15,8 @@ What it changes:
      RetroArch hotkeys that collide with P2 keys, core auto-frameskip).
   3. Core memory: falls back to a smaller shared-memory maximum when the
      browser refuses the default 2 GB ("Out of memory" on some iPhones).
+  4. Disc files downloaded into OPFS are read through a Worker sync handle
+     (tools/opfs-reader.js) — iOS 17 Safari fails on getFile().slice().
 Resync after a network stall is handled in tools/lockstep-page.js.
 """
 import base64
@@ -27,6 +29,7 @@ SRC = ROOT / "play-ios18-fixed-v5-thai-menu-fix6.html"
 OUT = ROOT / "play-online.html"
 PRELUDE = (ROOT / "tools" / "lockstep-core-prelude.js").read_text(encoding="utf-8")
 PAGE_JS = (ROOT / "tools" / "lockstep-page.js").read_text(encoding="utf-8")
+OPFS_READER = (ROOT / "tools" / "opfs-reader.js").read_text(encoding="utf-8")
 
 
 def replace_once(text, old, new, label):
@@ -170,8 +173,22 @@ def main():
     )
     new_write = (
         "\t\t\t\t// BR2: ไฟล์แผ่นเกมเก็บเป็นชิ้นละ 8 MB (ไม่ต้องจองแรมก้อนใหญ่ก้อนเดียว → ไม่ Out of memory บน iPhone)\n"
-        "\t\t\t\tconst CHUNK = 8 * 1024 * 1024, size = blob.size, pieces = [];\n"
-        "\t\t\t\tfor (let off = 0; off < size; off += CHUNK) pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer()));\n"
+        "\t\t\t\tconst CHUNK = 8 * 1024 * 1024, size = blob.size;\n"
+        "\t\t\t\tlet pieces = [];\n"
+        "\t\t\t\t// ไฟล์ที่ดาวน์โหลดเก็บใน OPFS: อ่านผ่าน Worker (iOS 17 อ่านด้วย slice() ไม่ได้)\n"
+        "\t\t\t\tif (blob.__br2OpfsName && typeof window !== \"undefined\" && window.br2OpfsReadPieces) {\n"
+        "\t\t\t\t\ttry { pieces = await window.br2OpfsReadPieces(blob.__br2OpfsName, size, CHUNK); }\n"
+        "\t\t\t\t\tcatch (err) { console.warn(\"BR2 OPFS worker read failed, falling back to slice()\", err); pieces = []; }\n"
+        "\t\t\t\t}\n"
+        "\t\t\t\tif (!pieces.length) for (let off = 0; off < size; off += CHUNK) {\n"
+        "\t\t\t\t\tfor (let tries = 1; ; tries++) {\n"
+        "\t\t\t\t\t\ttry { pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer())); break; }\n"
+        "\t\t\t\t\t\tcatch (err) {\n"
+        "\t\t\t\t\t\t\tif (tries >= 3) throw new Error(\"อ่านไฟล์เกมไม่ได้ที่ \" + Math.round(off / 1048576) + \"/\" + Math.round(size / 1048576) + \" MB (แรมเครื่องอาจไม่พอ) — \" + (err && err.message || err));\n"
+        "\t\t\t\t\t\t\tawait new Promise(r => setTimeout(r, 400 * tries));\n"
+        "\t\t\t\t\t\t}\n"
+        "\t\t\t\t\t}\n"
+        "\t\t\t\t}\n"
         "\t\t\t\ttry { FS.unlink(filePath); } catch {}\n"
         "\t\t\t\tFS.writeFile(filePath, new Uint8Array(0), { encoding: \"binary\" });\n"
         "\t\t\t\tconst node = FS.lookupPath(filePath).node;\n"
@@ -192,6 +209,25 @@ def main():
         "\t\t\t\treturn;\n"
     )
     html = replace_once(html, old_write, new_write, "chunked disc file")
+    # files downloaded into OPFS (even the small .cue) also go through the worker reader
+    html = replace_once(
+        html,
+        'if (blob && typeof blob.slice === "function" && blob.size > 16 * 1024 * 1024) {',
+        'if (blob && typeof blob.slice === "function" && (blob.size > 16 * 1024 * 1024 || blob.__br2OpfsName)) {',
+        "opfs small files",
+    )
+    html = replace_once(
+        html,
+        "files.push(extractedFile);",
+        "try { extractedFile.__br2OpfsName = safeName; } catch (_) {} files.push(extractedFile);",
+        "mark opfs file",
+    )
+    html = replace_once(
+        html,
+        "    async function br2CreateOpfsWriter(fileName) {",
+        OPFS_READER.rstrip("\n") + "\n    async function br2CreateOpfsWriter(fileName) {",
+        "opfs reader",
+    )
     html = replace_once(html, "<title>", "<title>BR2 Online · ", "title")
 
     OUT.write_text(html, encoding="utf-8")
