@@ -14,7 +14,8 @@ What it changes:
      (auto-save, resume from save, pause when the app is in the background,
      RetroArch hotkeys that collide with P2 keys, core auto-frameskip).
   3. Core memory: falls back to a smaller shared-memory maximum when the
-     browser refuses the default 2 GB ("Out of memory" on some iPhones).
+     browser refuses the default 2 GB, or when too little is left for the disc
+     afterwards; iOS 17 and older start at 384 MB ("Out of memory" on iPhone).
   4. Disc files downloaded into OPFS are read through a Worker sync handle
      (tools/opfs-reader.js) — iOS 17 Safari fails on getFile().slice().
 Resync after a network stall is handled in tools/lockstep-page.js.
@@ -99,9 +100,17 @@ def patch_core(js):
     js = replace_once(
         js,
         "wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:32768,shared:true})",
-        "wasmMemory=null;for(var __br2mx of [32768,16384,12288,8192]){try{"
-        "wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:__br2mx,shared:true});"
-        "globalThis.__br2MemMax=__br2mx;break}catch(__br2e){if(__br2mx===8192)throw __br2e}}",
+        # iOS 17: a large shared-memory reservation leaves no room for ANY other
+        # ArrayBuffer (even 8 MB → "RangeError: Out of memory"), so after reserving,
+        # check that ~576 MB is still free for the disc; if not, reserve less.
+        "wasmMemory=null;var __br2ios=/(iPhone|iPad|iPod).* OS (\\d+)_/.exec(globalThis.navigator&&navigator.userAgent||'');"
+        "var __br2list=(__br2ios&&+__br2ios[2]<=17)?[6144,4096]:[32768,16384,12288,8192,6144,4096];"
+        "for(var __br2i2=0;__br2i2<__br2list.length;__br2i2++){var __br2mx=__br2list[__br2i2],__br2last=__br2i2===__br2list.length-1;"
+        "try{wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:__br2mx,shared:true})}"
+        "catch(__br2e){wasmMemory=null;if(__br2last)throw __br2e;continue}"
+        "var __br2free=false;try{var __br2p=new ArrayBuffer(576*1048576);__br2free=__br2p.byteLength>0;__br2p=null}catch(__br2e2){}"
+        "globalThis.__br2MemMax=__br2mx;globalThis.__br2MemProbe=__br2free;"
+        "if(__br2free||__br2last)break;wasmMemory=null}",
         "memory fallback",
     )
     return js
@@ -187,7 +196,7 @@ def main():
         "\t\t\t\t\tfor (let tries = 1; ; tries++) {\n"
         "\t\t\t\t\t\ttry { pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer())); break; }\n"
         "\t\t\t\t\t\tcatch (err) {\n"
-        "\t\t\t\t\t\t\tif (tries >= 3) throw new Error(\"อ่านไฟล์เกมไม่ได้ที่ \" + Math.round(off / 1048576) + \"/\" + Math.round(size / 1048576) + \" MB — \" + (err && err.message || err) + (opfsErr ? \" · OPFS: \" + opfsErr : \" · ไม่ได้ลองอ่านจาก OPFS\"));\n"
+        "\t\t\t\t\t\t\tif (tries >= 3) throw new Error(\"อ่านไฟล์เกมไม่ได้ที่ \" + Math.round(off / 1048576) + \"/\" + Math.round(size / 1048576) + \" MB — \" + (err && err.message || err) + (opfsErr ? \" · OPFS: \" + opfsErr : \" · ไม่ได้ลองอ่านจาก OPFS\") + \" · แรมตัวจำลอง \" + ((globalThis.__br2MemMax || 0) / 16) + \" MB\" + (globalThis.__br2MemProbe === false ? \" (เหลือแรมน้อย)\" : \"\"));\n"
         "\t\t\t\t\t\t\tawait new Promise(r => setTimeout(r, 400 * tries));\n"
         "\t\t\t\t\t\t}\n"
         "\t\t\t\t\t}\n"
