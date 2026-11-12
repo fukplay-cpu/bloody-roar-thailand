@@ -152,6 +152,46 @@ def main():
         "pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };",
         "core cfg",
     )
+    # "Out of memory" in expandFileStorage on iPhone: MEMFS keeps a file as ONE
+    # contiguous Uint8Array, and Safari refuses a single allocation the size of the
+    # whole disc. Keep big disc files as a list of 8 MB pieces instead (same total
+    # memory, no huge block, no copy) and serve reads from those pieces.
+    old_write = (
+        '\t\t\t\tconst stream = FS.open(filePath, "w");\n'
+        "\t\t\t\t// Pré-alloue la taille finale → MEMFS n'agrandit plus par doublement (pic ~2× → OOM iPhone).\n"
+        "\t\t\t\ttry { FS.truncate(filePath, blob.size); } catch {}\n"
+        "\t\t\t\tconst CHUNK = 8 * 1024 * 1024;\n"
+        "\t\t\t\tfor (let off = 0; off < blob.size; off += CHUNK) {\n"
+        "\t\t\t\t\tconst chunk = new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer());\n"
+        "\t\t\t\t\tFS.write(stream, chunk, 0, chunk.length, off);\n"
+        "\t\t\t\t}\n"
+        "\t\t\t\tFS.close(stream);\n"
+        "\t\t\t\treturn;\n"
+    )
+    new_write = (
+        "\t\t\t\t// BR2: ไฟล์แผ่นเกมเก็บเป็นชิ้นละ 8 MB (ไม่ต้องจองแรมก้อนใหญ่ก้อนเดียว → ไม่ Out of memory บน iPhone)\n"
+        "\t\t\t\tconst CHUNK = 8 * 1024 * 1024, size = blob.size, pieces = [];\n"
+        "\t\t\t\tfor (let off = 0; off < size; off += CHUNK) pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer()));\n"
+        "\t\t\t\ttry { FS.unlink(filePath); } catch {}\n"
+        "\t\t\t\tFS.writeFile(filePath, new Uint8Array(0), { encoding: \"binary\" });\n"
+        "\t\t\t\tconst node = FS.lookupPath(filePath).node;\n"
+        "\t\t\t\tnode.contents = new Uint8Array(0); node.usedBytes = size; node.br2Pieces = pieces;\n"
+        "\t\t\t\tnode.stream_ops = Object.assign({}, node.stream_ops, {\n"
+        "\t\t\t\t\tread(stream, buffer, offset, length, position) {\n"
+        "\t\t\t\t\t\tconst n = stream.node; if (position >= n.usedBytes) return 0;\n"
+        "\t\t\t\t\t\tlet todo = Math.min(n.usedBytes - position, length), done = 0;\n"
+        "\t\t\t\t\t\twhile (todo > 0) {\n"
+        "\t\t\t\t\t\t\tconst p = n.br2Pieces[Math.floor(position / CHUNK)], at = position % CHUNK, k = Math.min(todo, p.length - at);\n"
+        "\t\t\t\t\t\t\tbuffer.set(p.subarray(at, at + k), offset + done); done += k; position += k; todo -= k;\n"
+        "\t\t\t\t\t\t}\n"
+        "\t\t\t\t\t\treturn done;\n"
+        "\t\t\t\t\t},\n"
+        "\t\t\t\t\twrite() { throw new FS.ErrnoError(63); },\n"
+        "\t\t\t\t\tmmap() { throw new FS.ErrnoError(43); }\n"
+        "\t\t\t\t});\n"
+        "\t\t\t\treturn;\n"
+    )
+    html = replace_once(html, old_write, new_write, "chunked disc file")
     html = replace_once(html, "<title>", "<title>BR2 Online · ", "title")
 
     OUT.write_text(html, encoding="utf-8")
