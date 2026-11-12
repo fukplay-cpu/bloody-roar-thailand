@@ -10,7 +10,7 @@
     // ถ้าภาพสองเครื่องเพี้ยนกัน (มักเกิดหลังปิงค้าง) ให้ทั้งสองเครื่องหยุดที่เฟรมเดียวกัน (K)
     // แล้ว P1 ส่งเซฟสถานะของตัวเองให้ P2 โหลดทับ จากนั้นเดินต่อพร้อมกัน → ภาพกลับมาตรงกัน
     // ข้อความส่งผ่าน Worker เดิม (จำกัด 2048 ตัวอักษร/ข้อความ) จึงแบ่งเซฟเป็นชิ้นเล็กๆ
-    var RS_STALL_MS=700, RS_COOLDOWN_MS=8000, RS_CHUNK=1800;
+    var RS_STALL_MS=300, RS_COOLDOWN_MS=5000, RS_CHUNK=1800;
     var RS={active:false,k:0,lastDone:0,parts:null,n:0,got:0,z:0,len:0,h:'',abort:false,peerDone:false,go:false,btn:null};
     function rsRequest(){
       if(!LS.started||RS.active) return;
@@ -141,6 +141,7 @@
       if(!RS.active){
         if(LS.avail<F){ if(!LS.waitSince) LS.waitSince=performance.now(); }
         else if(LS.waitSince){ var stalled=performance.now()-LS.waitSince; LS.waitSince=0;
+          if(stalled>=150){ try{ log('Lockstep: เกมหยุดรออีกเครื่อง '+Math.round(stalled)+' ms ที่เฟรม '+F,'muted'); }catch(_){ } }
           if(stalled>=RS_STALL_MS&&Date.now()-RS.lastDone>RS_COOLDOWN_MS){ try{ log('Lockstep: ค้างรออีกเครื่อง '+Math.round(stalled)+' ms → ซิงก์ภาพใหม่','err'); }catch(_){ } rsRequest(); } }
       }
       var cap=RS.active?RS.k-1:Infinity;
