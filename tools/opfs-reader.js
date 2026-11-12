@@ -2,6 +2,7 @@
     // Safari บน iOS 17 อ่านไฟล์ OPFS ขนาดใหญ่ผ่าน getFile().slice() ไม่ได้ ("The I/O read operation failed")
     // จึงอ่านด้วย createSyncAccessHandle ใน Worker แทน (วิธีเดียวกับตอนเขียนไฟล์ ใช้ได้ทั้ง iOS 17 และ 18)
     // คืนค่าเป็นรายการชิ้นละ chunk ไบต์ ให้ writeFile ของตัวจำลองใช้ต่อได้ทันที
+    window.__br2Log = function(m, c) { try { log(m, c); } catch (_) {} };
     window.br2OpfsReadPieces = async function(fileName, size, chunk, onProgress) {
       var src = `
         var access = null;
@@ -25,7 +26,7 @@
               if (access) { access.close(); access = null; }
               self.postMessage({id:m.id, ok:true});
             }
-          } catch (err) { self.postMessage({id:m.id, ok:false, error:(err && err.message) || String(err)}); }
+          } catch (err) { self.postMessage({id:m.id, ok:false, error:(err && ((err.name ? err.name + ': ' : '') + err.message)) || String(err)}); }
         };`;
       var url = URL.createObjectURL(new Blob([src], {type:'text/javascript'}));
       var worker = new Worker(url), seq = 0, pending = {};
