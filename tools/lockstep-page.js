@@ -91,41 +91,31 @@
     };
     function lsHash(u8){ var h=0x811c9dc5; for(var i=0;i<u8.length;i+=7){ h^=u8[i]; h=Math.imul(h,0x01000193); } return (h>>>0).toString(16)+':'+u8.length; }
     function lsCmd(M,name){ try{ if(M&&typeof M[name]==='function'){ M[name](); return true; } }catch(_){ } return false; }
-    // ปล่อยให้ตัวเกมเดินทีละเฟรมขณะยังล็อกอยู่
-    async function lsStep(n){
-      for(var i=0;i<n;i++){
-        Atomics.store(LS.B,6,1);
-        var t0=performance.now();
-        while(Atomics.load(LS.B,6)>0 && performance.now()-t0<4000) await wait(4);
-      }
-    }
-    // โหลดจุดเซฟกลาง (หน้าเลือกตัวละคร 2P) ให้ตรงกันทุกเฟรม โดยไม่พึ่งระบบหยุดเกมของ RetroArch:
-    // 1) ล็อกเฟรม  2) สั่งโหลดเซฟ (คำสั่งค้างไว้จนกว่าจะปล่อยเฟรม)
-    // 3) ปล่อยทีละเฟรม และรอนานพอให้การโหลดเสร็จก่อนปล่อยเฟรมถัดไป → ทั้งสองเครื่องได้สถานะเดียวกันทุกไบต์
+    // โหลดจุดเซฟกลาง (หน้าเลือกตัวละคร 2P) ให้ตรงกันทุกเฟรม:
+    // 1) หยุดเกม  2) โหลดเซฟ (เครื่องไหนเสร็จก่อนก็ยังหยุดรอ)  3) ล็อกเฟรม  4) สั่งเล่นต่อ — คำสั่งเล่นต่อจะถูกใช้ในเฟรมแรกที่ปล่อยพร้อมกันทั้งสองเครื่อง
     async function lsPrepareSave(M){
       var saveTag='boot';
-      Atomics.store(LS.B,6,0); Atomics.store(LS.B,0,1);
-      await wait(150);
       try{
         br2Status('ห้อง '+br2Online.room+' · กำลังโหลดจุดเซฟ…',false);
+        if(!lsCmd(M,'_cmd_pause')) throw new Error('หยุดเกมชั่วคราวไม่ได้');
+        await wait(300);
         var endpoint=new URL('/game-state',br2Online.worker).href;
         var response=await fetch(endpoint,{method:'GET',cache:'no-store'});
         if(!response.ok) throw new Error('ดาวน์โหลดจุดเซฟไม่สำเร็จ ('+response.status+')');
         var bytes=new Uint8Array(await response.arrayBuffer());
         if(!bytes.length) throw new Error('ไฟล์จุดเซฟว่างเปล่า');
-        await ng.loadState(bytes);
-        await wait(700); await lsStep(1);
-        await wait(900); await lsStep(1);
-        await wait(500); await lsStep(1);
-        await wait(300); await lsStep(1);
+        await robustLoadState(bytes);
+        await wait(1500);
         saveTag=lsHash(bytes);
         log('Lockstep: โหลดจุดเซฟแล้ว ('+(bytes.length/1048576).toFixed(2)+' MB)','ok');
       }catch(e){
-        // โหลดเซฟไม่ได้ → รีเซ็ตเกมแบบเดียวกัน ให้ทั้งสองเครื่องเริ่มจากหน้าแรกพร้อมกัน
+        // โหลดเซฟไม่ได้ → รีเซ็ตเกมระหว่างหยุด ให้ทั้งสองเครื่องเริ่มจากหน้าแรกพร้อมกัน
         try{ showLog(); log('Lockstep: '+(e&&e.message||e)+' → เริ่มจากหน้าแรกของเกม','err'); }catch(_){ }
-        lsCmd(M,'_cmd_reset');
-        await wait(500); await lsStep(1); await wait(500); await lsStep(1); await wait(300); await lsStep(1);
+        lsCmd(M,'_cmd_reset'); await wait(800);
       }
+      Atomics.store(LS.B,0,1);   // ล็อก: ห้ามเดินเฟรมจนกว่าทั้งสองเครื่องพร้อม
+      await wait(250);
+      lsCmd(M,'_cmd_unpause');   // รอใช้ในเฟรมแรกที่ปล่อย
       LS.fp=lsFingerprint()+'|'+saveTag; LS.myReady=true; lsSendReady(true); lsTryStart(); lsShow();
     }
     function lsOnMessage(ev){

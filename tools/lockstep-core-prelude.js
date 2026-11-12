@@ -32,11 +32,6 @@ globalThis.__br2Online = true;
     if (!B) return true; // ยังไม่ผูกกับหน้าเว็บ: เดินตามปกติ (หยุดตอนเปิดเกมทำให้ระบบภาพเสีย)
     var mode = Atomics.load(B, 0);
     if (mode === 0) return true;
-    if (mode === 1) {
-      // ล็อกอยู่ แต่หน้าเว็บอนุญาตให้เดินทีละเฟรม (B[6] = จำนวนเฟรมที่ยอมให้เดิน) ใช้ตอนโหลดเซฟให้ตรงกัน
-      if (Atomics.load(B, 6) > 0) { Atomics.sub(B, 6, 1); return true; }
-      B[3]++; return false;
-    }
     if (mode !== 2) { B[3]++; return false; }
     var f = B[1];
     if (Atomics.load(B, 2) < f) { B[3]++; return false; }
