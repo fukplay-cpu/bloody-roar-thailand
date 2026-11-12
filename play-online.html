@@ -2495,15 +2495,26 @@ try {
 			// au lieu de 3-4 copies en RAM (getUint8Array→createDataFile→readFile→writeFile) qui font
 			// crasher l'onglet iPhone sur les gros jeux (FF7/8). Pic RAM ≈ 1× le disque + 1 morceau.
 			if (blob && typeof blob.slice === "function" && blob.size > 16 * 1024 * 1024) {
-				const stream = FS.open(filePath, "w");
-				// Pré-alloue la taille finale → MEMFS n'agrandit plus par doublement (pic ~2× → OOM iPhone).
-				try { FS.truncate(filePath, blob.size); } catch {}
-				const CHUNK = 8 * 1024 * 1024;
-				for (let off = 0; off < blob.size; off += CHUNK) {
-					const chunk = new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer());
-					FS.write(stream, chunk, 0, chunk.length, off);
-				}
-				FS.close(stream);
+				// BR2: ไฟล์แผ่นเกมเก็บเป็นชิ้นละ 8 MB (ไม่ต้องจองแรมก้อนใหญ่ก้อนเดียว → ไม่ Out of memory บน iPhone)
+				const CHUNK = 8 * 1024 * 1024, size = blob.size, pieces = [];
+				for (let off = 0; off < size; off += CHUNK) pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer()));
+				try { FS.unlink(filePath); } catch {}
+				FS.writeFile(filePath, new Uint8Array(0), { encoding: "binary" });
+				const node = FS.lookupPath(filePath).node;
+				node.contents = new Uint8Array(0); node.usedBytes = size; node.br2Pieces = pieces;
+				node.stream_ops = Object.assign({}, node.stream_ops, {
+					read(stream, buffer, offset, length, position) {
+						const n = stream.node; if (position >= n.usedBytes) return 0;
+						let todo = Math.min(n.usedBytes - position, length), done = 0;
+						while (todo > 0) {
+							const p = n.br2Pieces[Math.floor(position / CHUNK)], at = position % CHUNK, k = Math.min(todo, p.length - at);
+							buffer.set(p.subarray(at, at + k), offset + done); done += k; position += k; todo -= k;
+						}
+						return done;
+					},
+					write() { throw new FS.ErrnoError(63); },
+					mmap() { throw new FS.ErrnoError(43); }
+				});
 				return;
 			}
 			const buffer = await resolvable.getUint8Array();
