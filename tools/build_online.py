@@ -240,6 +240,14 @@ def main():
         OPFS_READER.rstrip("\n") + "\n    async function br2CreateOpfsWriter(fileName) {",
         "opfs reader",
     )
+    # both machines must run the exact same core options: HD (neon enhancement) is a
+    # per-device setting, so it is turned off for online play
+    html = replace_once(
+        html,
+        "if(hdOn) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }",
+        "if(hdOn&&!window.__br2Lockstep) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }",
+        "hd off online",
+    )
     html = replace_once(html, "<title>", "<title>BR2 Online · ", "title")
 
     OUT.write_text(html, encoding="utf-8")
