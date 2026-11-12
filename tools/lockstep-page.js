@@ -6,6 +6,102 @@
     var LS={delay:4,fixedDelay:false,RING:256,ws:null,B:null,sab:null,local:{},remote:{},sent:-1,avail:-1,started:false,myReady:false,peerFp:null,fp:'',rtt:0,lastPong:0,lastStall:0,stallMs:0,error:'',reconnectTimer:null,pumpTimer:null};
     var LS_BTN=['up','down','left','right','a','b','x','y','l','r','l2','r2','start','select','l_x_minus','l_x_plus','l_y_minus','l_y_plus','r_x_minus','r_x_plus','r_y_minus','r_y_plus'];
     var lsHeld={}; window.__br2LS=LS;
+    // ---------- ซิงก์ภาพใหม่ (resync) ----------
+    // ถ้าภาพสองเครื่องเพี้ยนกัน (มักเกิดหลังปิงค้าง) ให้ทั้งสองเครื่องหยุดที่เฟรมเดียวกัน (K)
+    // แล้ว P1 ส่งเซฟสถานะของตัวเองให้ P2 โหลดทับ จากนั้นเดินต่อพร้อมกัน → ภาพกลับมาตรงกัน
+    // ข้อความส่งผ่าน Worker เดิม (จำกัด 2048 ตัวอักษร/ข้อความ) จึงแบ่งเซฟเป็นชิ้นเล็กๆ
+    var RS_STALL_MS=700, RS_COOLDOWN_MS=8000, RS_CHUNK=1800;
+    var RS={active:false,k:0,lastDone:0,parts:null,n:0,got:0,z:0,len:0,h:'',abort:false,peerDone:false,go:false,btn:null};
+    function rsRequest(){
+      if(!LS.started||RS.active) return;
+      if(br2Online.role===1) rsBegin(LS.sent+1);
+      else lsSendRaw({t:'rsq',p:br2Online.role});
+    }
+    function rsBegin(k){
+      if(RS.active||!LS.started) return;
+      RS.active=true; RS.k=k; RS.parts=null; RS.n=0; RS.got=0; RS.abort=false; RS.peerDone=false; RS.go=false;
+      if(br2Online.role===1) lsSendRaw({t:'rs',p:1,k:k});
+      lsShow();
+      rsRun().catch(function(e){ try{ showLog(); log('ซิงก์ภาพ: '+(e&&e.message||e),'err'); }catch(_){ } rsFinish(); });
+    }
+    async function rsWaitFor(test,ms){ var t0=Date.now(); while(!test()){ if(Date.now()-t0>ms) return false; await wait(20); } return true; }
+    function rsB64(u8){ var s='', CH=0x8000; for(var i=0;i<u8.length;i+=CH) s+=String.fromCharCode.apply(null,u8.subarray(i,i+CH)); return btoa(s); }
+    function rsUnB64(s){ var bin=atob(s), u8=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i); return u8; }
+    async function rsGzip(u8,compress){
+      if(typeof CompressionStream==='undefined'||typeof DecompressionStream==='undefined') return null;
+      var stream=new Blob([u8]).stream().pipeThrough(compress?new CompressionStream('gzip'):new DecompressionStream('gzip'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+    async function rsSendState(bytes){
+      var z=0, data=bytes;
+      try{ var c=await rsGzip(bytes,true); if(c&&c.length<bytes.length){ data=c; z=1; } }catch(_){ }
+      var b64=rsB64(data), n=Math.ceil(b64.length/RS_CHUNK);
+      if(!lsSendRaw({t:'rsh',p:1,n:n,z:z,len:bytes.length,h:lsHash(bytes)})) throw new Error('ส่งข้อมูลไม่ได้ (หลุดการเชื่อมต่อ)');
+      for(var i=0;i<n;i++){
+        while(LS.ws&&LS.ws.bufferedAmount>262144) await wait(10);
+        if(!lsSendRaw({t:'sc',p:1,i:i,d:b64.substr(i*RS_CHUNK,RS_CHUNK)})) throw new Error('ส่งเซฟไม่ครบ (หลุดการเชื่อมต่อ)');
+        if(i%50===49){ br2Status('ห้อง '+br2Online.room+' · กำลังซิงก์ภาพ… '+Math.round((i+1)*100/n)+'%',false); await wait(0); }
+      }
+      log('ซิงก์ภาพ: ส่งเซฟ '+(data.length/1024).toFixed(0)+' KB ('+n+' ชิ้น)','ok');
+    }
+    async function rsReceiveState(){
+      var ok=await rsWaitFor(function(){ return RS.abort||(RS.parts&&RS.got===RS.n); },60000);
+      if(!ok||RS.abort) throw new Error(RS.abort?'P1 ส่งเซฟไม่สำเร็จ':'รอรับเซฟนานเกินไป');
+      var data=rsUnB64(RS.parts.join('')); RS.parts=null;
+      var bytes=RS.z?await rsGzip(data,false):data;
+      if(!bytes||bytes.length!==RS.len||lsHash(bytes)!==RS.h) throw new Error('เซฟที่ได้รับไม่สมบูรณ์');
+      await robustLoadState(bytes);
+      await wait(1500);
+      log('ซิงก์ภาพ: โหลดเซฟจาก P1 แล้ว','ok');
+    }
+    async function rsRun(){
+      var M=null; try{ M=ng.getEmscriptenModule(); }catch(_){ }
+      var role=br2Online.role, failed='';
+      // 1) รอจนตัวเกมหยุดอยู่ที่เฟรม K พอดี (ทั้งสองเครื่องจะหยุดที่เฟรมเดียวกัน)
+      if(!await rsWaitFor(function(){ return Atomics.load(LS.B,1)>=RS.k; },20000)) failed='รอเฟรมไม่ทัน';
+      if(!failed&&Atomics.load(LS.B,1)!==RS.k) failed='เฟรมไม่ตรง ('+Atomics.load(LS.B,1)+' / '+RS.k+')';
+      if(!failed){
+        // 2) หยุดเกมชั่วคราว แล้วปล่อยให้ RetroArch ทำงาน (คำสั่งเซฟ/โหลดต้องใช้) โดยตัวเกมไม่เดิน
+        lsCmd(M,'_cmd_pause'); await wait(200);
+        Atomics.store(LS.B,0,0); await wait(300);
+        try{
+          if(role===1){ var st=await robustSaveState(); await rsSendState(new Uint8Array(await st.state.arrayBuffer())); }
+          else await rsReceiveState();
+        }catch(e){ failed=(e&&e.message)||String(e); if(role===1) lsSendRaw({t:'rsx',p:1}); }
+        // 3) ล็อกเฟรมไว้ก่อน แล้วค่อยสั่งเล่นต่อ (ใช้ในเฟรมแรกที่ปล่อยพร้อมกัน เหมือนตอนเริ่มเกม)
+        Atomics.store(LS.B,0,1); await wait(250);
+        lsCmd(M,'_cmd_unpause');
+      }
+      else if(role===1) lsSendRaw({t:'rsx',p:1});
+      if(failed){ try{ showLog(); log('ซิงก์ภาพไม่สำเร็จ: '+failed,'err'); }catch(_){ } }
+      // 4) นัดเดินต่อพร้อมกัน
+      if(role===1){ await rsWaitFor(function(){ return RS.peerDone; },45000); lsSendRaw({t:'rsgo',p:1}); }
+      else { lsSendRaw({t:'rsd',p:2}); await rsWaitFor(function(){ return RS.go; },45000); }
+      rsFinish();
+    }
+    function rsFinish(){
+      RS.active=false; RS.parts=null; RS.lastDone=Date.now(); LS.waitSince=0;
+      if(LS.B) Atomics.store(LS.B,0,2);
+      lsPump(); lsShow();
+    }
+    function rsOnMessage(d){
+      if(d.t==='rsq'){ if(br2Online.role===1&&Date.now()-RS.lastDone>3000) rsRequest(); return true; }
+      if(d.t==='rs'){ if(br2Online.role===2&&typeof d.k==='number') rsBegin(d.k); return true; }
+      if(d.t==='rsh'){ RS.n=d.n|0; RS.z=d.z|0; RS.len=d.len|0; RS.h=String(d.h||''); RS.parts=new Array(RS.n); RS.got=0; return true; }
+      if(d.t==='sc'){ if(RS.parts&&d.i>=0&&d.i<RS.n&&RS.parts[d.i]===undefined){ RS.parts[d.i]=String(d.d||''); RS.got++;
+          if(RS.got%50===0) br2Status('ห้อง '+br2Online.room+' · กำลังซิงก์ภาพ… '+Math.round(RS.got*100/RS.n)+'%',false); } return true; }
+      if(d.t==='rsx'){ RS.abort=true; return true; }
+      if(d.t==='rsd'){ RS.peerDone=true; return true; }
+      if(d.t==='rsgo'){ RS.go=true; return true; }
+      return false;
+    }
+    function rsMakeButton(){
+      if(RS.btn) return;
+      var b=document.createElement('button'); b.type='button'; b.textContent='🔄 ซิงก์ภาพ';
+      b.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 72px);padding:6px 10px;border:1px solid #64748b;border-radius:9px;background:#101722e0;color:#f8fafc;font:12px -apple-system,BlinkMacSystemFont,sans-serif';
+      b.addEventListener('click',function(e){ e.preventDefault(); if(!LS.started||RS.active) return; log('ซิงก์ภาพ: กดเอง','ok'); rsRequest(); });
+      document.body.appendChild(b); RS.btn=b;
+    }
     function br2Status(message,ok){
       var el=br2Online.status;
       if(!el){el=document.createElement('div');el.id='br2-online-status';el.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);max-width:min(62vw,300px);padding:7px 10px;border:1px solid #64748b;border-radius:9px;background:#101722eF;color:#f8fafc;font:12px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none;text-align:right;white-space:pre-line';document.body.appendChild(el);br2Online.status=el;}
@@ -33,6 +129,7 @@
       if(LS.error){ br2Status('ห้อง '+br2Online.room+' · '+who+'\n'+LS.error,false); return; }
       if(!ng){ br2Status('ห้อง '+br2Online.room+' · '+who+'\nกด "เล่นต่อ" หรือเลือกไฟล์เกม Bloody Roar 2',false); return; }
       if(!LS.started){ br2Status('ห้อง '+br2Online.room+' · '+who+'\n'+(LS.peerFp?'กำลังเริ่ม…':'รออีกเครื่องโหลดเกม…'),false); return; }
+      if(RS.active){ br2Status(who+' · 🔄 กำลังซิงก์ภาพให้ตรงกัน…\n(รอสักครู่ เกมจะเดินต่อเอง)',false); return; }
       var F=LS.B?Atomics.load(LS.B,1):0;
       var waiting=LS.avail<F;
       br2Status(who+' · เฟรม '+F+'\nping '+Math.round(LS.rtt)+' ms · หน่วง '+LS.delay+' เฟรม'+(waiting?'\n⏳ รอข้อมูลจากอีกเครื่อง…':''),!waiting);
@@ -40,15 +137,22 @@
     function lsPump(){
       if(!LS.started||!LS.B) return;
       var B=LS.B, F=Atomics.load(B,1);
+      // จับเวลาที่เกมต้องหยุดรออีกเครื่อง: ถ้าค้างนาน (ปิงกระตุก/หลุด) ให้ซิงก์ภาพใหม่อัตโนมัติ
+      if(!RS.active){
+        if(LS.avail<F){ if(!LS.waitSince) LS.waitSince=performance.now(); }
+        else if(LS.waitSince){ var stalled=performance.now()-LS.waitSince; LS.waitSince=0;
+          if(stalled>=RS_STALL_MS&&Date.now()-RS.lastDone>RS_COOLDOWN_MS){ try{ log('Lockstep: ค้างรออีกเครื่อง '+Math.round(stalled)+' ms → ซิงก์ภาพใหม่','err'); }catch(_){ } rsRequest(); } }
+      }
+      var cap=RS.active?RS.k-1:Infinity;
       // สุ่มอ่านปุ่มของเราล่วงหน้า delay เฟรม แล้วส่งให้อีกเครื่อง
-      while(LS.sent < F+LS.delay && LS.sent-F < LS.RING-16){
+      while(LS.sent < F+LS.delay && LS.sent < cap && LS.sent-F < LS.RING-16){
         LS.sent++; var b=lsBits(); LS.local[LS.sent]=b;
         lsSendRaw({t:'i',p:br2Online.role,f:LS.sent,b:b});
       }
       // เฟรมที่รู้ปุ่มครบทั้งสองฝั่ง → เขียนลงหน่วยความจำร่วมให้ตัวเกมใช้
       while(true){
         var n=LS.avail+1, mine=LS.local[n], theirs=LS.remote[n];
-        if(mine===undefined||theirs===undefined) break;
+        if(n>cap||mine===undefined||theirs===undefined) break;
         var base=16+(n%LS.RING)*2;
         B[base]=br2Online.role===1?mine:theirs;
         B[base+1]=br2Online.role===1?theirs:mine;
@@ -122,6 +226,7 @@
       var d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
       if(d.t){
         if(d.p===br2Online.role) return;
+        if(rsOnMessage(d)) return;
         if(d.t==='i'){ if(typeof d.f==='number'&&LS.remote[d.f]===undefined&&d.f>LS.avail) LS.remote[d.f]=d.b|0; lsPump(); }
         else if(d.t==='rdy'){ LS.peerFp=String(d.fp||''); if(d.ask) lsSendReady(false); lsTryStart(); lsShow(); }
         else if(d.t==='ping'){ lsSendRaw({t:'pong',p:br2Online.role,ts:d.ts}); }
@@ -156,7 +261,7 @@
       br2Online.room=(q.get('room')||'').toUpperCase(); br2Online.playerId=q.get('playerId')||''; br2Online.worker=q.get('worker')||br2Online.worker;
       var dl=parseInt(q.get('delay')||'',10); if(dl>=1&&dl<=15){ LS.delay=dl; LS.fixedDelay=true; }
       if(!/^[A-Z0-9]{6}$/.test(br2Online.room)||!br2Online.playerId){ br2Status('หน้านี้สำหรับเล่นออนไลน์\nกรุณาเข้าผ่านหน้า "ห้องออนไลน์"',false); return; }
-      lsConnect();
+      lsConnect(); rsMakeButton();
       LS.pumpTimer=setInterval(lsPump,4);
       setInterval(function(){ lsSendRaw({t:'ping',p:br2Online.role,ts:performance.now()}); lsShow(); },1000);
     }

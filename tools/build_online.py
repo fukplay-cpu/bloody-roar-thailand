@@ -11,7 +11,11 @@ What it changes:
      and injects those inputs straight into RetroArch's keyboard callbacks.
   2. Page script: replaces the old online input bridge with the lockstep client,
      and turns off things that would make the two machines differ
-     (auto-save, resume from save, pause when the app is in the background).
+     (auto-save, resume from save, pause when the app is in the background,
+     RetroArch hotkeys that collide with P2 keys, core auto-frameskip).
+  3. Core memory: falls back to a smaller shared-memory maximum when the
+     browser refuses the default 2 GB ("Out of memory" on some iPhones).
+Resync after a network stall is handled in tools/lockstep-page.js.
 """
 import base64
 import pathlib
@@ -86,6 +90,17 @@ def patch_core(js):
         'Module["pauseMainLoop"]=MainLoop.pause;Module["__br2PThread"]=PThread;',
         "expose PThread",
     )
+    # 5) "Out of memory" at 0% on some iPhones: the core reserves a 2 GB shared
+    #    memory up front and Safari refuses it. Try 2 GB, then fall back to
+    #    smaller maximums (the wasm accepts any maximum <= its declared one).
+    js = replace_once(
+        js,
+        "wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:32768,shared:true})",
+        "wasmMemory=null;for(var __br2mx of [32768,16384,12288,8192]){try{"
+        "wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:__br2mx,shared:true});"
+        "globalThis.__br2MemMax=__br2mx;break}catch(__br2e){if(__br2mx===8192)throw __br2e}}",
+        "memory fallback",
+    )
     return js
 
 
@@ -122,8 +137,20 @@ def main():
     html = replace_once(
         html,
         "c.savestate_thumbnail_enable=false;",
-        "c.savestate_thumbnail_enable=false; c.pause_nonactive=false; c.rewind_enable=false; c.run_ahead_enabled=false;",
+        "c.savestate_thumbnail_enable=false; c.pause_nonactive=false; c.rewind_enable=false; c.run_ahead_enabled=false;"
+        # RetroArch hotkeys that collide with the P2 keyboard bindings (P2 start = F1 = menu,
+        # P2 square = O = movie record, ...) would change emulator state outside lockstep.
+        " c.savestate_auto_load=false; c.input_menu_toggle='nul'; c.input_bsv_record_toggle='nul'; c.input_osk_toggle='nul';"
+        " c.input_toggle_slowmotion='nul'; c.input_close_content='nul'; c.input_toggle_statistics='nul'; c.input_menu_toggle_gamepad_combo=0;",
         "retroarch cfg",
+    )
+    # the core must never skip frames on its own (auto frameskip reacts to the audio buffer,
+    # which empties during a network stall → the two machines would emulate differently)
+    html = replace_once(
+        html,
+        "pcsx_rearmed_pad1type:'dualshock' };",
+        "pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };",
+        "core cfg",
     )
     html = replace_once(html, "<title>", "<title>BR2 Online · ", "title")
 
