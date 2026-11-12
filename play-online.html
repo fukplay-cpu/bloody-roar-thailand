@@ -2497,7 +2497,15 @@ try {
 			if (blob && typeof blob.slice === "function" && blob.size > 16 * 1024 * 1024) {
 				// BR2: ไฟล์แผ่นเกมเก็บเป็นชิ้นละ 8 MB (ไม่ต้องจองแรมก้อนใหญ่ก้อนเดียว → ไม่ Out of memory บน iPhone)
 				const CHUNK = 8 * 1024 * 1024, size = blob.size, pieces = [];
-				for (let off = 0; off < size; off += CHUNK) pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer()));
+				for (let off = 0; off < size; off += CHUNK) {
+					for (let tries = 1; ; tries++) {
+						try { pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer())); break; }
+						catch (err) {
+							if (tries >= 3) throw new Error("อ่านไฟล์เกมไม่ได้ที่ " + Math.round(off / 1048576) + "/" + Math.round(size / 1048576) + " MB (แรมเครื่องอาจไม่พอ) — " + (err && err.message || err));
+							await new Promise(r => setTimeout(r, 400 * tries));
+						}
+					}
+				}
 				try { FS.unlink(filePath); } catch {}
 				FS.writeFile(filePath, new Uint8Array(0), { encoding: "binary" });
 				const node = FS.lookupPath(filePath).node;
