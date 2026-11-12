@@ -2497,17 +2497,20 @@ try {
 			if (blob && typeof blob.slice === "function" && (blob.size > 16 * 1024 * 1024 || blob.__br2OpfsName)) {
 				// BR2: ไฟล์แผ่นเกมเก็บเป็นชิ้นละ 8 MB (ไม่ต้องจองแรมก้อนใหญ่ก้อนเดียว → ไม่ Out of memory บน iPhone)
 				const CHUNK = 8 * 1024 * 1024, size = blob.size;
-				let pieces = [];
-				// ไฟล์ที่ดาวน์โหลดเก็บใน OPFS: อ่านผ่าน Worker (iOS 17 อ่านด้วย slice() ไม่ได้)
-				if (blob.__br2OpfsName && typeof window !== "undefined" && window.br2OpfsReadPieces) {
-					try { pieces = await window.br2OpfsReadPieces(blob.__br2OpfsName, size, CHUNK); }
-					catch (err) { console.warn("BR2 OPFS worker read failed, falling back to slice()", err); pieces = []; }
+				let pieces = [], opfsErr = "";
+				// ไฟล์เกมที่ดาวน์โหลดเก็บใน OPFS (รวมถึงตอนกด 'เล่นต่อ' ซึ่งไฟล์ยังอยู่ใน OPFS ชื่อ br2-<ชื่อไฟล์>)
+				// อ่านผ่าน Worker เพราะ iOS 17 อ่านด้วย slice() ไม่ได้
+				const opfsName = blob.__br2OpfsName || (blob.name ? "br2-" + String(blob.name).replace(/[^a-z0-9._-]/gi, "_") : "");
+				const br2Log = (typeof window !== "undefined" && window.__br2Log) || function() {};
+				if (opfsName && typeof window !== "undefined" && window.br2OpfsReadPieces) {
+					try { pieces = await window.br2OpfsReadPieces(opfsName, size, CHUNK); br2Log("อ่านไฟล์เกมจาก OPFS ผ่าน Worker สำเร็จ: " + opfsName, "ok"); }
+					catch (err) { opfsErr = (err && (err.name ? err.name + ": " : "") + err.message) || String(err); br2Log("อ่าน OPFS ผ่าน Worker ไม่ได้ (" + opfsName + "): " + opfsErr, "err"); pieces = []; }
 				}
 				if (!pieces.length) for (let off = 0; off < size; off += CHUNK) {
 					for (let tries = 1; ; tries++) {
 						try { pieces.push(new Uint8Array(await blob.slice(off, off + CHUNK).arrayBuffer())); break; }
 						catch (err) {
-							if (tries >= 3) throw new Error("อ่านไฟล์เกมไม่ได้ที่ " + Math.round(off / 1048576) + "/" + Math.round(size / 1048576) + " MB (แรมเครื่องอาจไม่พอ) — " + (err && err.message || err));
+							if (tries >= 3) throw new Error("อ่านไฟล์เกมไม่ได้ที่ " + Math.round(off / 1048576) + "/" + Math.round(size / 1048576) + " MB — " + (err && err.message || err) + (opfsErr ? " · OPFS: " + opfsErr : " · ไม่ได้ลองอ่านจาก OPFS"));
 							await new Promise(r => setTimeout(r, 400 * tries));
 						}
 					}
@@ -4621,6 +4624,7 @@ void main()
     // Safari บน iOS 17 อ่านไฟล์ OPFS ขนาดใหญ่ผ่าน getFile().slice() ไม่ได้ ("The I/O read operation failed")
     // จึงอ่านด้วย createSyncAccessHandle ใน Worker แทน (วิธีเดียวกับตอนเขียนไฟล์ ใช้ได้ทั้ง iOS 17 และ 18)
     // คืนค่าเป็นรายการชิ้นละ chunk ไบต์ ให้ writeFile ของตัวจำลองใช้ต่อได้ทันที
+    window.__br2Log = function(m, c) { try { log(m, c); } catch (_) {} };
     window.br2OpfsReadPieces = async function(fileName, size, chunk, onProgress) {
       var src = `
         var access = null;
@@ -4644,7 +4648,7 @@ void main()
               if (access) { access.close(); access = null; }
               self.postMessage({id:m.id, ok:true});
             }
-          } catch (err) { self.postMessage({id:m.id, ok:false, error:(err && err.message) || String(err)}); }
+          } catch (err) { self.postMessage({id:m.id, ok:false, error:(err && ((err.name ? err.name + ': ' : '') + err.message)) || String(err)}); }
         };`;
       var url = URL.createObjectURL(new Blob([src], {type:'text/javascript'}));
       var worker = new Worker(url), seq = 0, pending = {};
