@@ -29,7 +29,7 @@ globalThis.__br2Online = true;
   G.__br2Gate = function () {
     if (!G.__br2Online) return true;
     var B = G.__br2i;
-    if (!B) return false;
+    if (!B) return true; // ยังไม่ผูกกับหน้าเว็บ: เดินตามปกติ (หยุดตอนเปิดเกมทำให้ระบบภาพเสีย)
     var mode = Atomics.load(B, 0);
     if (mode === 0) return true;
     if (mode !== 2) { B[3]++; return false; }
