@@ -265,6 +265,11 @@
       lsConnect(); rsMakeButton();
       LS.pumpTimer=setInterval(lsPump,4);
       setInterval(function(){ lsSendRaw({t:'ping',p:br2Online.role,ts:performance.now()}); lsShow(); },1000);
+      // บันทึกวิเคราะห์: จำนวนครั้งที่ตัวเกมอ่านปุ่มต่อ 1 เฟรมล็อก (ปกติควรเท่ากันทุกเฟรม)
+      var lsDiagLast='';
+      setInterval(function(){ if(!LS.started||!LS.B) return; var B=LS.B;
+        var t='อ่านปุ่ม/เฟรม 0:'+B[9]+' 1:'+B[10]+' 2:'+B[11]+' 3+:'+B[12]+' · เปลี่ยน '+B[14]+' ครั้ง (ล่าสุดเฟรม '+B[15]+')';
+        if(t!==lsDiagLast){ lsDiagLast=t; try{ log('วิเคราะห์: '+t,'muted'); }catch(_){ } } },10000);
     }
     window.addEventListener('beforeunload',function(){ try{ if(LS.ws) LS.ws.close(); }catch(_){ } });
     br2ConnectFromUrl();

@@ -94,6 +94,15 @@ def patch_core(js):
         'Module["pauseMainLoop"]=MainLoop.pause;Module["__br2PThread"]=PThread;',
         "expose PThread",
     )
+    # 4b) diagnostics: count RetroArch input polls (≈ core frames) between two
+    #     lockstep steps — if a step ever runs more or fewer core frames than
+    #     usual, the two machines drift apart
+    js = replace_once(
+        js,
+        "function _emscripten_sample_gamepad_data(){",
+        "function _emscripten_sample_gamepad_data(){if(globalThis.__br2i)Atomics.add(globalThis.__br2i,6,1);",
+        "poll counter",
+    )
     # 5) "Out of memory" at 0% on some iPhones: the core reserves a 2 GB shared
     #    memory up front and Safari refuses it. Try 2 GB, then fall back to
     #    smaller maximums (the wasm accepts any maximum <= its declared one).
