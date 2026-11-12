@@ -64,8 +64,8 @@
         lsShow(); return;
       }
       LS.error='';
-      for(var f=0;f<LS.delay;f++){ LS.local[f]=0; LS.remote[f]=0; }
-      LS.sent=LS.delay-1; LS.avail=-1;
+      // ไม่เติมเฟรมล่วงหน้า: ทั้งสองเครื่องส่งปุ่มจริงตั้งแต่เฟรม 0 (ค่าหน่วงของสองเครื่องไม่จำเป็นต้องเท่ากัน)
+      LS.sent=-1; LS.avail=-1;
       Atomics.store(LS.B,1,0); Atomics.store(LS.B,2,-1); Atomics.store(LS.B,0,2);
       LS.started=true;
       try{ log('Lockstep เริ่มแล้ว · P'+br2Online.role+' · หน่วง '+LS.delay+' เฟรม','ok'); }catch(_){ }
