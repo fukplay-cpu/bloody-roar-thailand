@@ -4039,7 +4039,7 @@ void main()
     var hdOn=false; try{ hdOn=(localStorage.getItem('psx_hd')==='1'); }catch(_){ }
     // Options du core (identiques aux 3 lancements). enhancement_enable = résolution interne ×2 (bouton HD).
     function coreCfg(){ var c={ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };
-      if(hdOn) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }
+      if(hdOn&&!window.__br2Lockstep) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }
     function toggleHd(){
       hdOn=!hdOn; try{ localStorage.setItem('psx_hd', hdOn?'1':'0'); }catch(_){ }
       var btn=document.getElementById('btn-hd'); if(btn) btn.classList.toggle('on', hdOn);
