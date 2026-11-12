@@ -36,6 +36,10 @@ globalThis.__br2Online = true;
     var f = B[1];
     if (Atomics.load(B, 2) < f) { B[3]++; return false; }
     B[4] = (G.__br2kcb || []).length;
+    // diagnostics: input polls since the previous step → histogram [9]=0, [10]=1, [11]=2, [12]=3+
+    var pc = Atomics.load(B, 6), d = pc - (G.__br2lastPoll === undefined ? pc : G.__br2lastPoll);
+    G.__br2lastPoll = pc;
+    if (f > 0) { Atomics.add(B, 9 + Math.min(d, 3), 1); if (d !== B[13]) { B[14]++; B[15] = f; } B[13] = d; }
     var base = 16 + (f % RING) * 2;
     apply(0, B[base]);
     apply(1, B[base + 1]);
