@@ -4196,6 +4196,20 @@ try {
       }catch(_){ }
     }
     window.__br2Stream={ST:ST,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
+    // ออกจากหน้าเกม / สลับแอป: หยุดเสียงและวิดีโอ (iOS เล่นเสียงของ <video> ต่อในพื้นหลังได้)
+    function stOnHidden(){
+      try{ if(ST.video){ ST.video.muted=true; ST.video.pause(); } }catch(_){ }
+      try{ if(ST.audioDest&&ST.audioDest.context&&ST.audioDest.context.state==='running') ST.audioDest.context.suspend(); }catch(_){ }
+      // P1: หยุดเกมชั่วคราว (การส่งภาพทำให้ iOS ไม่พักหน้าเว็บ เกมกับเสียงจึงเล่นต่อในพื้นหลัง)
+      try{ if(stRole()===1&&ng&&!ST.hidePaused){ ng.pause(); ST.hidePaused=true; stLog('สลับแอป → หยุดเกมชั่วคราว','muted'); } }catch(_){ }
+    }
+    function stOnVisible(){
+      try{ if(ST.video){ ST.video.play().catch(function(){}); if(ST.tap&&ST.video.srcObject&&ST.video.srcObject.getAudioTracks().length) ST.tap.style.display=''; } }catch(_){ }
+      try{ if(ST.audioDest&&ST.audioDest.context&&ST.audioDest.context.state==='suspended') ST.audioDest.context.resume(); }catch(_){ }
+      try{ if(ST.hidePaused&&ng){ ng.resume(); ST.hidePaused=false; stLog('กลับมาที่เกม → เล่นต่อ','muted'); } }catch(_){ }
+    }
+    document.addEventListener('visibilitychange',function(){ if(!ST.on) return; if(document.hidden) stOnHidden(); else stOnVisible(); });
+    window.addEventListener('pagehide',function(){ if(!ST.on) return; stOnHidden(); stClosePc(); });
     function stStart(){
       stLog('เริ่มโหมดส่งภาพ (P'+(ST.hint||'?')+')','ok');
       if(window.__br2Viewer) setTimeout(stViewerUi,0); // หลังสคริปต์ทั้งหน้าทำงานครบ (ไม่งั้นตัวแปรของ D-pad ถูกรีเซ็ต)
