@@ -94,13 +94,14 @@ def patch_core(js):
         'Module["pauseMainLoop"]=MainLoop.pause;Module["__br2PThread"]=PThread;',
         "expose PThread",
     )
-    # 4b) diagnostics: count RetroArch input polls (≈ core frames) between two
-    #     lockstep steps — if a step ever runs more or fewer core frames than
-    #     usual, the two machines drift apart
+    # 4b) THE lockstep gate: the game reads the controller exactly once per emulated
+    #     frame; block there until both players' inputs for that frame are known.
+    #     (Gating per main-loop step drifted: PAL 50 fps on a 60 Hz screen skips game
+    #     frames on wall-clock timing, differently on each phone.)
     js = replace_once(
         js,
         "function _emscripten_sample_gamepad_data(){",
-        "function _emscripten_sample_gamepad_data(){if(globalThis.__br2i)Atomics.add(globalThis.__br2i,6,1);",
+        "function _emscripten_sample_gamepad_data(){if(ENVIRONMENT_IS_PTHREAD&&globalThis.__br2PollGate)globalThis.__br2PollGate();",
         "poll counter",
     )
     # 5) "Out of memory" at 0% on some iPhones: the core reserves a 2 GB shared
