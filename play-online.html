@@ -4057,7 +4057,8 @@ try {
       var v=document.createElement('video'); v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline',''); v.autoplay=true; v.muted=true;
       v.style.cssText='position:fixed;z-index:2;background:#000;object-fit:contain;pointer-events:none';
       document.body.appendChild(v); ST.video=v;
-      try{ var pd=document.getElementById('pad'); if(pd) pd.classList.add('show'); }catch(_){ }
+      var coarseUi=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
+      try{ var pd=document.getElementById('pad'); if(pd&&coarseUi) pd.classList.add('show'); }catch(_){ } // บนคอมไม่ต้องมีปุ่มบนจอ (ใช้คีย์บอร์ด/จอย)
       function place(){
         var s=document.getElementById('screen'), r=s?s.getBoundingClientRect():null, vw=window.innerWidth, vh=window.innerHeight;
         if(!r||r.width<80||r.height<60){ // ยังไม่ได้เปิดเกมในเครื่องนี้ canvas อาจมีขนาด 0 → วางวิดีโอเองเต็มความกว้าง
@@ -4065,6 +4066,9 @@ try {
           var w=vw, h=Math.round(w*3/4); if(top+h>vh){ h=vh-top; w=Math.round(h*4/3); }
           r={left:(vw-w)/2,top:top,width:w,height:h};
         }
+        // อย่าให้วิดีโอทับแถบเมนูด้านบน
+        var bar2=document.getElementById('bar'), minTop=bar2?bar2.getBoundingClientRect().bottom+6:0;
+        if(r.top<minTop){ var hh=Math.min(r.height,vh-minTop-6), ww=Math.min(r.width,Math.round(hh*4/3)); hh=Math.round(ww*3/4); r={left:(vw-ww)/2,top:minTop,width:ww,height:hh}; }
         v.style.left=r.left+'px'; v.style.top=r.top+'px'; v.style.width=r.width+'px'; v.style.height=r.height+'px'; }
       place(); setInterval(place,300); window.addEventListener('resize',function(){ setTimeout(place,50); });
       var tap=document.createElement('button'); tap.type='button'; tap.textContent='🔊 แตะเพื่อเปิดเสียง';
@@ -4077,6 +4081,40 @@ try {
         if(info!==ST.lastInfo&&(Date.now()-(ST.lastInfoAt||0)>5000)){ ST.lastInfo=info; ST.lastInfoAt=Date.now(); stLog(info); }
       },1000);
       setInterval(stSendInput,100); // ส่งซ้ำเผื่อหาย
+      stViewerKeys();
+      var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
+      if(!coarse) stLog('เล่นบนคอม: ลูกศร=ทิศทาง · Z=✕ X=○ A=□ S=△ · Q/W=L1/R1 · 1/2=L2/R2 · Enter=Start · Shift ขวา=Select · หรือเสียบจอย','ok');
+    }
+    // ----- P2 บนคอม: คีย์บอร์ดและจอย (ไม่มีปุ่มบนจอเพราะไม่ใช่จอสัมผัส) -----
+    // ปุ่มคีย์บอร์ดเหมือน P1: ลูกศร = ทิศทาง, Z=✕ X=○ A=□ S=△, Q=L1 W=R1, 1=L2 2=R2, Enter=Start, Shift ขวา=Select
+    var ST_KEYS={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',KeyZ:'b',KeyX:'a',KeyA:'y',KeyS:'x',
+      KeyQ:'l',KeyW:'r',Digit1:'l2',Digit2:'r2',Enter:'start',NumpadEnter:'start',ShiftRight:'select'};
+    function stViewerKeys(){
+      function on(e,down){
+        if(!window.__br2Viewer) return;
+        var t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable)) return;
+        var b=ST_KEYS[e.code]; if(!b) return;
+        e.preventDefault(); if(e.repeat) return;
+        br2Input(b,down);
+      }
+      window.addEventListener('keydown',function(e){ on(e,true); },true);
+      window.addEventListener('keyup',function(e){ on(e,false); },true);
+      window.addEventListener('blur',function(){ Object.keys(ST_KEYS).forEach(function(k){ var b=ST_KEYS[k]; if(lsHeld[b]&&ST.padHeld&&!ST.padHeld[b]) br2Input(b,false); }); });
+      // จอย (Gamepad API, ปุ่มแบบมาตรฐาน): 0=✕ 1=○ 2=□ 3=△ 4=L1 5=R1 6=L2 7=R2 8=Select 9=Start 12-15=ทิศทาง, ก้านซ้าย=ทิศทาง
+      var GP=[['b',0],['a',1],['y',2],['x',3],['l',4],['r',5],['l2',6],['r2',7],['select',8],['start',9],['up',12],['down',13],['left',14],['right',15]];
+      var gpPrev={}, gpSeen=false;
+      function poll(){
+        requestAnimationFrame(poll);
+        if(!window.__br2Viewer||!navigator.getGamepads) return;
+        var pads=navigator.getGamepads(), g=null; for(var i=0;i<pads.length;i++){ if(pads[i]&&pads[i].connected){ g=pads[i]; break; } }
+        if(!g) return;
+        if(!gpSeen){ gpSeen=true; stLog('เจอจอย: '+g.id,'ok'); }
+        var now={};
+        GP.forEach(function(m){ var bt=g.buttons[m[1]]; now[m[0]]=!!(bt&&(bt.pressed||bt.value>0.5)); });
+        var ax=g.axes||[]; if(ax.length>=2){ if(ax[0]<-0.5) now.left=true; if(ax[0]>0.5) now.right=true; if(ax[1]<-0.5) now.up=true; if(ax[1]>0.5) now.down=true; }
+        Object.keys(now).forEach(function(k){ if(!!gpPrev[k]!==now[k]){ gpPrev[k]=now[k]; br2Input(k,now[k]); } });
+      }
+      requestAnimationFrame(poll);
     }
     function stHelloSoon(ms){ clearTimeout(ST.helloTimer); ST.helloTimer=setTimeout(stHello,ms||0); }
     function stHello(){
