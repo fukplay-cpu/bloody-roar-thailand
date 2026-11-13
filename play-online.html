@@ -3967,7 +3967,7 @@ try {
       globalThis.__br2OnFrame=function(bmp,err){
         if(err){ stLog('จับภาพในเธรดเกมไม่ได้: '+err,'err'); return; }
         if(!bmp) return;
-        try{ if(cv.width!==bmp.width||cv.height!==bmp.height){ cv.width=bmp.width; cv.height=bmp.height; } cx.drawImage(bmp,0,0); ST.frames++; ST.grabbed++; ST.grabAt=performance.now(); }catch(_){ }
+        try{ if(cv.width!==bmp.width||cv.height!==bmp.height){ cv.width=bmp.width; cv.height=bmp.height; } cx.drawImage(bmp,0,0); ST.frames++; ST.grabbed++; ST.grabAt=performance.now(); if(ST.vtrack&&ST.vtrack.requestFrame) ST.vtrack.requestFrame(); }catch(_){ }
         try{ bmp.close(); }catch(_){ }
       };
       globalThis.__br2OnInfo=function(m){ stLog('เธรดเกม: '+m,'muted'); };
@@ -3980,10 +3980,13 @@ try {
           var w=Math.min(ST.capW,s.width), h=Math.round(w*s.height/s.width)||480;
           if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
           cx.drawImage(s,0,0,w,h); ST.frames++;
+          if(ST.vtrack&&ST.vtrack.requestFrame) ST.vtrack.requestFrame(); // ส่งเฟรมทันทีที่วาดเสร็จ
         }catch(_){ }
       }
       draw();
-      var ms=cv.captureStream(60);
+      var ms=null;
+      try{ ms=cv.captureStream(0); ST.vtrack=ms.getVideoTracks()[0]; if(!ST.vtrack||!ST.vtrack.requestFrame){ ms=null; } }catch(_){ ms=null; }
+      if(!ms){ ms=cv.captureStream(60); ST.vtrack=null; }
       ST.media=ms; stAddAudio();
       // ตรวจว่าวาดสำเนาได้จริง (ไม่ดำล้วน) — ถ้าไม่ได้ ลองส่ง canvas ของเกมตรงๆ
       function check(){
@@ -4361,7 +4364,7 @@ void main()
     var dotMode=0; try{ dotMode=parseInt(localStorage.getItem('psx_dot')||'0',10)||0; }catch(_){ }
     var hdOn=false; try{ hdOn=(localStorage.getItem('psx_hd')==='1'); }catch(_){ }
     // Options du core (identiques aux 3 lancements). enhancement_enable = résolution interne ×2 (bouton HD).
-    function coreCfg(){ var c={ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };
+    function coreCfg(){ var c={ pcsx_rearmed_bios:(biosBlob?'auto':'HLE'), pcsx_rearmed_show_bios_bootlogo:'disabled', pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_pad2type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };
       if(hdOn&&!window.__br2Lockstep) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }
     function toggleHd(){
       hdOn=!hdOn; try{ localStorage.setItem('psx_hd', hdOn?'1':'0'); }catch(_){ }
@@ -4517,7 +4520,7 @@ void main()
     var dpadEl=null, dpadPointer=null, dpadDirs={up:false,down:false,left:false,right:false};
     var stickCtl={};
     function makeStick(el,pfx){ if(!el) return null; var knob=el.querySelector('.knob'); var pid=null, act={};
-      function set(name,on){ var k=pfx+'_'+name; if(act[k]===on) return; act[k]=on; try{ if(ng){ br2Input(k,on); } }catch(_){ } }
+      function set(name,on){ var k=pfx+'_'+name; if(act[k]===on) return; act[k]=on; try{ if(ng||window.__br2Viewer){ br2Input(k,on); } }catch(_){ } }
       function upd(e){ var r=el.getBoundingClientRect(); var nx=(e.clientX-(r.left+r.width/2))/(r.width/2), ny=(e.clientY-(r.top+r.height/2))/(r.height/2); var m=Math.hypot(nx,ny); if(m>1){nx/=m;ny/=m;}
         knob.style.left=(50+nx*32)+'%'; knob.style.top=(50+ny*32)+'%'; var dz=0.34;
         set('x_minus',nx<-dz); set('x_plus',nx>dz); set('y_minus',ny<-dz); set('y_plus',ny>dz); }
@@ -4654,7 +4657,7 @@ void main()
     }
     installEditorPanelDrag();
     loadPadLayout();installPadDrag();
-    function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng)br2Input(n,false); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
+    function releaseAll(){ Object.keys(held).forEach(function(n){ var el=held[n]; if(el&&el.classList)el.classList.remove('on'); try{ if(ng||window.__br2Viewer)br2Input(n,false); }catch(_){ } }); held={}; clearDpad(); if(stickCtl.l)stickCtl.l.reset(); if(stickCtl.r)stickCtl.r.reset(); }
     window.addEventListener('blur',releaseAll); document.addEventListener('visibilitychange',function(){ if(document.hidden) releaseAll(); });
 
     var fitT=null;

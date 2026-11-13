@@ -181,7 +181,9 @@ def main():
     # stream-mode viewer (P2) has no emulator: the touch pad must still send its buttons
     for old, new in (("try{ if(ng) br2Input(name,true); }", "try{ if(ng||window.__br2Viewer) br2Input(name,true); }"),
                      ("try{ if(ng) br2Input(name,false); }", "try{ if(ng||window.__br2Viewer) br2Input(name,false); }"),
-                     ("try{ if(ng){ br2Input(dir,on); } }", "try{ if(ng||window.__br2Viewer){ br2Input(dir,on); } }")):
+                     ("try{ if(ng){ br2Input(dir,on); } }", "try{ if(ng||window.__br2Viewer){ br2Input(dir,on); } }"),
+                     ("try{ if(ng){ br2Input(k,on); } }", "try{ if(ng||window.__br2Viewer){ br2Input(k,on); } }"),
+                     ("try{ if(ng)br2Input(n,false); }", "try{ if(ng||window.__br2Viewer)br2Input(n,false); }")):
         html = replace_once(html, old, new, "viewer pad " + old[:24])
     # stream-mode viewer (P2) never opens the game
     for fn in ("async function resumeFromStored(id){", "async function handleFiles(fileList){",
@@ -215,7 +217,7 @@ def main():
     html = replace_once(
         html,
         "pcsx_rearmed_pad1type:'dualshock' };",
-        "pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };",
+        "pcsx_rearmed_pad1type:'dualshock', pcsx_rearmed_pad2type:'dualshock', pcsx_rearmed_frameskip_type:'disabled', pcsx_rearmed_frameskip:'0' };",
         "core cfg",
     )
     # "Out of memory" in expandFileStorage on iPhone: MEMFS keeps a file as ONE
