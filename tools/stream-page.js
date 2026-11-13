@@ -92,7 +92,7 @@
       globalThis.__br2OnFrame=function(bmp,err){
         if(err){ stLog('จับภาพในเธรดเกมไม่ได้: '+err,'err'); return; }
         if(!bmp) return;
-        try{ if(cv.width!==bmp.width||cv.height!==bmp.height){ cv.width=bmp.width; cv.height=bmp.height; } cx.drawImage(bmp,0,0); ST.frames++; ST.grabbed++; ST.grabAt=performance.now(); if(ST.vtrack&&ST.vtrack.requestFrame) ST.vtrack.requestFrame(); }catch(_){ }
+        try{ if(cv.width!==bmp.width||cv.height!==bmp.height){ cv.width=bmp.width; cv.height=bmp.height; } cx.drawImage(bmp,0,0); ST.frames++; ST.grabbed++; ST.grabAt=performance.now(); }catch(_){ }
         try{ bmp.close(); }catch(_){ }
       };
       globalThis.__br2OnInfo=function(m){ stLog('เธรดเกม: '+m,'muted'); };
@@ -105,13 +105,10 @@
           var w=Math.min(ST.capW,s.width), h=Math.round(w*s.height/s.width)||480;
           if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
           cx.drawImage(s,0,0,w,h); ST.frames++;
-          if(ST.vtrack&&ST.vtrack.requestFrame) ST.vtrack.requestFrame(); // ส่งเฟรมทันทีที่วาดเสร็จ
         }catch(_){ }
       }
       draw();
-      var ms=null;
-      try{ ms=cv.captureStream(0); ST.vtrack=ms.getVideoTracks()[0]; if(!ST.vtrack||!ST.vtrack.requestFrame){ ms=null; } }catch(_){ ms=null; }
-      if(!ms){ ms=cv.captureStream(60); ST.vtrack=null; }
+      var ms=cv.captureStream(60);
       ST.media=ms; stAddAudio();
       // ตรวจว่าวาดสำเนาได้จริง (ไม่ดำล้วน) — ถ้าไม่ได้ ลองส่ง canvas ของเกมตรงๆ
       function check(){
@@ -177,6 +174,7 @@
 
     // ----- P2: รับภาพ -----
     function stViewerUi(){
+      if(ST.viewerUi) return; ST.viewerUi=true;
       try{ var ld=document.getElementById('loader'); if(ld) ld.classList.add('hidden'); }catch(_){ }
       try{ document.body.classList.add('running'); }catch(_){ }
       try{ if(typeof buildPad==='function') buildPad(); }catch(_){ }
@@ -283,7 +281,7 @@
     window.__br2Stream={ST:ST,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
     function stStart(){
       stLog('เริ่มโหมดส่งภาพ (P'+(ST.hint||'?')+')','ok');
-      if(window.__br2Viewer) stViewerUi();
+      if(window.__br2Viewer) setTimeout(stViewerUi,0); // หลังสคริปต์ทั้งหน้าทำงานครบ (ไม่งั้นตัวแปรของ D-pad ถูกรีเซ็ต)
       setInterval(function(){ stStats(); lsShow(); },1000);
       stHelloSoon(800);
     }
