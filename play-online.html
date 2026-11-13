@@ -3976,8 +3976,9 @@ try {
       var ms=cv.captureStream(60);
       ST.media=ms; stAddAudio();
       // ตรวจว่าวาดสำเนาได้จริง (ไม่ดำล้วน) — ถ้าไม่ได้ ลองส่ง canvas ของเกมตรงๆ
-      setTimeout(function(){
+      function check(){
         try{
+          if(ST.useDirect){ ST.capInfo='จับภาพตรง'; return; }
           var px=cx.getImageData(0,0,cv.width,cv.height).data, lit=0;
           for(var i=0;i<px.length;i+=4*97){ if(px[i]+px[i+1]+px[i+2]>30) lit++; }
           if(lit===0){
@@ -3988,9 +3989,12 @@ try {
                 if(ST.pc){ ST.pc.getSenders().forEach(function(snd){ if(snd.track&&snd.track.kind==='video') snd.replaceTrack(vt); }); }
                 stLog('วาดภาพสำเนาไม่ได้ → ส่งภาพจาก canvas ของเกมโดยตรง','muted'); }
             }
-          } else stLog('จับภาพเกมได้ ('+cv.width+'×'+cv.height+')','ok');
-        }catch(e){ stLog('ตรวจภาพไม่ได้: '+(e.message||e),'muted'); }
-      },3000);
+          }
+          var txt=lit?'มีภาพ '+cv.width+'×'+cv.height:'ภาพดำ';
+          if(txt!==ST.capInfo){ ST.capInfo=txt; stLog('ภาพที่จับได้: '+txt+' (วาดแล้ว '+ST.frames+' เฟรม)',lit?'ok':'err'); }
+        }catch(e){ stLog('ตรวจภาพไม่ได้: '+(e.message||e),'err'); }
+      }
+      setTimeout(check,3000); setInterval(check,5000);
       return ms;
     }
     async function stHostOffer(){
@@ -4023,7 +4027,14 @@ try {
       var v=document.createElement('video'); v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline',''); v.autoplay=true; v.muted=true;
       v.style.cssText='position:fixed;z-index:2;background:#000;object-fit:contain;pointer-events:none';
       document.body.appendChild(v); ST.video=v;
-      function place(){ var s=document.getElementById('screen'); if(!s) return; var r=s.getBoundingClientRect();
+      try{ var pd=document.getElementById('pad'); if(pd) pd.classList.add('show'); }catch(_){ }
+      function place(){
+        var s=document.getElementById('screen'), r=s?s.getBoundingClientRect():null, vw=window.innerWidth, vh=window.innerHeight;
+        if(!r||r.width<80||r.height<60){ // ยังไม่ได้เปิดเกมในเครื่องนี้ canvas อาจมีขนาด 0 → วางวิดีโอเองเต็มความกว้าง
+          var bar=document.getElementById('bar'), top=bar?Math.min(bar.getBoundingClientRect().bottom+8,vh*0.25):vh*0.15;
+          var w=vw, h=Math.round(w*3/4); if(top+h>vh){ h=vh-top; w=Math.round(h*4/3); }
+          r={left:(vw-w)/2,top:top,width:w,height:h};
+        }
         v.style.left=r.left+'px'; v.style.top=r.top+'px'; v.style.width=r.width+'px'; v.style.height=r.height+'px'; }
       place(); setInterval(place,300); window.addEventListener('resize',function(){ setTimeout(place,50); });
       var tap=document.createElement('button'); tap.type='button'; tap.textContent='🔊 แตะเพื่อเปิดเสียง';
@@ -4032,6 +4043,8 @@ try {
       document.body.appendChild(tap); ST.tap=tap;
       setInterval(function(){ // นับเฟรมที่ได้รับ เพื่อแสดงสถานะ
         try{ if(v.getVideoPlaybackQuality){ var q=v.getVideoPlaybackQuality(); ST.fps=q.totalVideoFrames-(ST.lastTotal||0); ST.lastTotal=q.totalVideoFrames; } }catch(_){ }
+        var info='วิดีโอ '+v.videoWidth+'×'+v.videoHeight+' · readyState '+v.readyState+' · ถอดรหัส '+(ST.decFps||0)+' fps · '+(ST.kbps||0)+' kbps';
+        if(info!==ST.lastInfo&&(Date.now()-(ST.lastInfoAt||0)>5000)){ ST.lastInfo=info; ST.lastInfoAt=Date.now(); stLog(info); }
       },1000);
       setInterval(stSendInput,100); // ส่งซ้ำเผื่อหาย
     }
@@ -4085,10 +4098,10 @@ try {
       var ping=' · ping '+Math.round(ST.rtt||LS.rtt)+' ms', route=ST.route?(' · '+ST.route):'';
       if(r===1){
         if(!ng){ br2Status('📺 โหมดส่งภาพ · คุณคือ P1 (รันเกม)\nกด "เล่นต่อ" หรือเลือกไฟล์เกม',false); return; }
-        if(ST.conn==='connected') br2Status('📺 P1 ส่งภาพอยู่'+ping+route,true);
+        if(ST.conn==='connected') br2Status('📺 P1 ส่งภาพอยู่'+ping+route+'\nส่ง '+(ST.encFps||0)+' fps · '+(ST.kbps||0)+' kbps'+(ST.capInfo?' · '+ST.capInfo:''),true);
         else br2Status('📺 P1 · รอ P2 เชื่อมต่อ…'+(ST.conn?' ('+ST.conn+')':''),false);
       } else {
-        if(ST.conn==='connected') br2Status('📺 P2 รับภาพ'+ping+route+(ST.fps?' · '+ST.fps+' fps':''),true);
+        if(ST.conn==='connected'){ var v=ST.video; br2Status('📺 P2 รับภาพ'+ping+route+'\nภาพ '+(v?v.videoWidth+'×'+v.videoHeight:'-')+' · '+(ST.decFps||0)+' fps · '+(ST.kbps||0)+' kbps',true); }
         else if(ST.conn==='failed') br2Status('📺 P2 · เชื่อมต่อตรงไม่ได้\nเน็ตมือถืออาจบล็อก — ลองใช้ Wi-Fi (กำลังลองใหม่…)',false);
         else br2Status('📺 โหมดส่งภาพ · คุณคือ P2\nกำลังเชื่อมต่อกับ P1…'+(ST.conn?' ('+ST.conn+')':''),false);
       }
@@ -4098,6 +4111,10 @@ try {
       try{
         var rep=await pc.getStats(), pair=null, cands={};
         rep.forEach(function(s){ if(s.type==='candidate-pair'&&s.state==='succeeded'&&(s.nominated||s.selected)) pair=s; if(s.type==='local-candidate'||s.type==='remote-candidate') cands[s.id]=s; });
+        rep.forEach(function(s){
+          if(s.type==='inbound-rtp'&&s.kind==='video'){ ST.decFps=s.framesDecoded-(ST.lastDec||0); ST.lastDec=s.framesDecoded; ST.kbps=Math.round(((s.bytesReceived||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesReceived||0; }
+          if(s.type==='outbound-rtp'&&s.kind==='video'){ ST.encFps=s.framesEncoded-(ST.lastEnc||0); ST.lastEnc=s.framesEncoded; ST.kbps=Math.round(((s.bytesSent||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesSent||0; }
+        });
         if(pair){ if(pair.currentRoundTripTime) ST.rtt=pair.currentRoundTripTime*1000;
           var lc=cands[pair.localCandidateId], rc=cands[pair.remoteCandidateId];
           var relay=(lc&&lc.candidateType==='relay')||(rc&&rc.candidateType==='relay');
