@@ -53,6 +53,25 @@ def patch_core(js):
         "MainLoop.runIter(iterFunc);if(!checkIsRunning())return;MainLoop.scheduler()};",
         "main-loop gate",
     )
+    # 1b) stream mode: grab the finished frame from RetroArch's OffscreenCanvas on the
+    #     emulator thread (Safari cannot read the page's placeholder canvas) and send it
+    #     to the page as an ImageBitmap.
+    grab = (
+        "var G=globalThis;if(G.__br2GrabBusy)return;"
+        "var send=function(m,t){if(typeof WorkerGlobalScope!=='undefined')postMessage(m,t||[]);else if(G.__br2Deliver)G.__br2Deliver(m)};"
+        "if(!G.__br2GrabSeen){G.__br2GrabSeen=1;send({cmd:'br2frame',info:'grab hook running ('+(typeof WorkerGlobalScope!=='undefined'?'worker':'main')+')'})}"
+        "var ctx=GL.currentContext&&GL.currentContext.GLctx,c=ctx&&ctx.canvas;if(!c||!c.width){if(!G.__br2GrabNoCtx){G.__br2GrabNoCtx=1;send({cmd:'br2frame',info:'no GL canvas: ctx='+!!ctx+' canvas='+!!c})}return}"
+        "G.__br2GrabBusy=true;var w=G.__br2GrabW||640,h=Math.round(w*c.height/c.width)||480,p;"
+        "try{p=createImageBitmap(c,{resizeWidth:w,resizeHeight:h,resizeQuality:'low'})}catch(e){try{p=createImageBitmap(c)}catch(e2){G.__br2GrabBusy=false;if(!G.__br2GrabErr){G.__br2GrabErr=1;send({cmd:'br2frame',err:String(e2)})}return}}"
+        "p.then(function(b){G.__br2GrabBusy=false;send({cmd:'br2frame',bmp:b},[b])},"
+        "function(e){G.__br2GrabBusy=false;if(!G.__br2GrabErr){G.__br2GrabErr=1;send({cmd:'br2frame',err:String(e)})}})"
+    )
+    js = replace_once(
+        js,
+        "MainLoop.runIter(iterFunc);if(!checkIsRunning())return;MainLoop.scheduler()};",
+        "MainLoop.runIter(iterFunc);if(globalThis.__br2Grab)try{(function(){" + grab + "})()}catch(_){}if(!checkIsRunning())return;MainLoop.scheduler()};",
+        "grab hook",
+    )
     # 2) remember RetroArch's keyboard callbacks in the thread that registers them,
     #    and provide a synchronous key injector for the gate
     injector = (
@@ -87,8 +106,17 @@ def patch_core(js):
         "var msgData=e.data;var cmd=msgData.cmd;if(cmd==1){",
         "var msgData=e.data;var cmd=msgData.cmd;"
         "if(cmd===\"br2lock\"){globalThis.__br2i=new Int32Array(msgData.sab);globalThis.__br2codes=msgData.codes;return}"
+        "if(cmd===\"br2grab\"){globalThis.__br2Grab=!!msgData.on;globalThis.__br2GrabW=msgData.w||640;postMessage({cmd:'br2frame',info:'grab '+(msgData.on?'on':'off')});return}"
         "if(cmd==1){",
         "worker message",
+    )
+    # 3b) page receives grabbed frames from the emulator thread
+    js = replace_once(
+        js,
+        "worker.onmessage=e=>{var d=e.data;var cmd=d.cmd;",
+        "worker.onmessage=e=>{var d=e.data;var cmd=d.cmd;"
+        "if(cmd===\"br2frame\"){try{if(d.info){if(globalThis.__br2OnInfo)globalThis.__br2OnInfo(d.info);return}if(globalThis.__br2OnFrame)globalThis.__br2OnFrame(d.bmp,d.err);else if(d.bmp&&d.bmp.close)d.bmp.close()}catch(_){}return}",
+        "frame message",
     )
     # 4) let the page reach the pthread workers
     js = replace_once(
