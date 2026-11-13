@@ -267,7 +267,7 @@
         if(idx<0){ br2Online.role=0; LS.error='ไม่พบผู้เล่นนี้ในห้อง'; lsShow(); return; }
         br2Online.role=idx+1; br2Online.ready=players.length===2;
         if(ST.on){
-          if(br2Online.role===2&&!ST.video){ window.__br2Viewer=true; if(!ng) stViewerUi(); stHelloSoon(300); }
+          if(br2Online.role===2&&!ST.video&&!ST.viewerUi){ window.__br2Viewer=true; if(!ng) stViewerUi(); stHelloSoon(300); }
           else if(br2Online.role===1&&window.__br2Viewer){ LS.error='⚠️ ลำดับผู้เล่นไม่ตรงกับหน้าห้อง\nกลับไปหน้าห้องแล้วกดเริ่มเกมใหม่'; }
         }
         lsShow();
