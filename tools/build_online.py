@@ -178,6 +178,11 @@ def main():
     assert page_js.endswith("br2ConnectFromUrl();")
     page_js = page_js[: -len("br2ConnectFromUrl();")] + STREAM_JS.strip() + "\n    br2ConnectFromUrl();"
     html = html[:start] + page_js + html[end:]
+    # stream-mode viewer (P2) has no emulator: the touch pad must still send its buttons
+    for old, new in (("try{ if(ng) br2Input(name,true); }", "try{ if(ng||window.__br2Viewer) br2Input(name,true); }"),
+                     ("try{ if(ng) br2Input(name,false); }", "try{ if(ng||window.__br2Viewer) br2Input(name,false); }"),
+                     ("try{ if(ng){ br2Input(dir,on); } }", "try{ if(ng||window.__br2Viewer){ br2Input(dir,on); } }")):
+        html = replace_once(html, old, new, "viewer pad " + old[:24])
     # stream-mode viewer (P2) never opens the game
     for fn in ("async function resumeFromStored(id){", "async function handleFiles(fileList){",
                "async function launchDisc(mainFile, u8, extraFiles){", "async function launchMulti(discList){"):

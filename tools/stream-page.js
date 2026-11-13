@@ -4,7 +4,7 @@
     // การนัดเชื่อมต่อ (SDP) ส่งผ่าน Worker ห้องเดิม — ข้อความละไม่เกิน 2048 ตัวอักษร จึงแบ่งเป็นชิ้น
     var ST={on:false,hint:0,pc:null,dc:null,video:null,media:null,audioDest:null,sig:{},sigTimer:null,
       lastBits:-1,lastSend:0,seq:0,remoteSeq:-1,remoteBits:0,conn:'',route:'',rtt:0,fps:0,frames:0,
-      tapNeeded:false,helloTimer:null,cv:null,raf:0,useDirect:false,connectStarted:0,
+      tapNeeded:false,capW:480,inCount:0,outCount:0,helloTimer:null,cv:null,raf:0,useDirect:false,connectStarted:0,
       ice:[{urls:['stun:stun.cloudflare.com:3478','stun:stun.l.google.com:19302']}]};
     (function(){
       try{
@@ -102,7 +102,7 @@
         if(ST.useDirect||performance.now()-(ST.grabAt||0)<500) return;
         try{
           var s=stGameCanvas(); if(!s||!s.width) return;
-          var w=Math.min(640,s.width), h=Math.round(w*s.height/s.width)||480;
+          var w=Math.min(ST.capW,s.width), h=Math.round(w*s.height/s.width)||480;
           if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
           cx.drawImage(s,0,0,w,h); ST.frames++;
         }catch(_){ }
@@ -118,8 +118,9 @@
           if(performance.now()-(ST.grabAt||0)<1000){ var t='มีภาพ '+cv.width+'×'+cv.height+' (เธรดเกม)'; if(t!==ST.capInfo){ ST.capInfo=t; stLog('ภาพที่จับได้: '+t,'ok'); } return; }
           var px=cx.getImageData(0,0,cv.width,cv.height).data, lit=0;
           for(var i=0;i<px.length;i+=4*97){ if(px[i]+px[i+1]+px[i+2]>30) lit++; }
-          if(lit===0&&!ST.grabTried){ ST.grabTried=true; stGrab(true); } // สำรอง: ให้เธรดของเกมจับภาพเอง
-          if(lit===0&&ST.grabTried&&ST.grabbed===0&&ST.checks>2){
+          var none=(ST.frames===0); // วาดไม่ได้เลยสักเฟรม (หน้าจอเกมสีดำเป็นเรื่องปกติ ไม่นับ)
+          if(none&&!ST.grabTried){ ST.grabTried=true; stGrab(true); } // สำรอง: ให้เธรดของเกมจับภาพเอง
+          if(none&&ST.grabTried&&ST.grabbed===0&&ST.checks>2){
             var s=stGameCanvas();
             if(s&&s.captureStream){
               var direct=s.captureStream(60), vt=direct.getVideoTracks()[0];
@@ -142,10 +143,10 @@
     }
     function stGrab(on){
       var n=0;
-      globalThis.__br2Grab=!!on; globalThis.__br2GrabW=640; // ถ้าลูปของเกมรันบนเธรดหลัก
+      globalThis.__br2Grab=!!on; globalThis.__br2GrabW=ST.capW; // ถ้าลูปของเกมรันบนเธรดหลัก
       globalThis.__br2Deliver=function(d){ if(d.info){ if(globalThis.__br2OnInfo) globalThis.__br2OnInfo(d.info); return; } if(globalThis.__br2OnFrame) globalThis.__br2OnFrame(d.bmp,d.err); };
       try{ var M=ng&&ng.getEmscriptenModule(), PT=M&&M.__br2PThread;
-        if(PT){ [].concat(PT.runningWorkers||[],PT.unusedWorkers||[]).forEach(function(w){ try{ w.postMessage({cmd:'br2grab',on:!!on,w:640}); n++; }catch(_){ } }); } }catch(_){ }
+        if(PT){ [].concat(PT.runningWorkers||[],PT.unusedWorkers||[]).forEach(function(w){ try{ w.postMessage({cmd:'br2grab',on:!!on,w:ST.capW}); n++; }catch(_){ } }); } }catch(_){ }
       stLog((on?'เปิด':'ปิด')+'การจับภาพในเธรดเกม (threads '+n+')','muted');
     }
     async function stHostOffer(){
@@ -153,7 +154,7 @@
       var ms=stHostMedia(), pc=stNewPc();
       ms.getTracks().forEach(function(t){ var snd=pc.addTrack(t,ms);
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
-          try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=3000000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
+          try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=1500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
       var dc=pc.createDataChannel('in',{ordered:false,maxRetransmits:0}); ST.dc=dc;
       dc.onmessage=function(e){ try{ stOnInput(JSON.parse(e.data)); }catch(_){ } };
       var offer=await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -162,11 +163,13 @@
       stLog('ส่งคำขอเชื่อมต่อให้ P2 แล้ว','muted');
     }
     function stOnInput(d){
-      if(typeof d.s!=='number'||d.s<=ST.remoteSeq) return;
-      ST.remoteSeq=d.s; var bits=d.b|0, old=ST.remoteBits; if(bits===old) return;
+      if(typeof d.s!=='number') return;
+      if(d.s<=ST.remoteSeq&&ST.remoteSeq-d.s<1000) return; // ข้อความเก่า/ซ้ำ (ถ้า P2 โหลดหน้าใหม่ ลำดับจะเริ่มใหม่ → รับ)
+      ST.remoteSeq=d.s; ST.inCount++; var bits=d.b|0, old=ST.remoteBits; if(bits===old) return;
       ST.remoteBits=bits;
+      if((ST.inLogged=(ST.inLogged||0)+1)<=6){ var names=[]; for(var k=0;k<LS_BTN.length;k++) if(bits&(1<<k)) names.push(LS_BTN[k]); stLog('ปุ่มจาก P2: '+(names.join('+')||'(ปล่อย)')+(ng?'':' — แต่ยังไม่ได้เปิดเกม'),'ok'); }
       for(var i=0;i<LS_BTN.length;i++){ var m=1<<i; if((old^bits)&m){
-        try{ if(bits&m) ng.pressDown({button:LS_BTN[i],player:2}); else ng.pressUp({button:LS_BTN[i],player:2}); }catch(_){ } } }
+        try{ if(bits&m) ng.pressDown({button:LS_BTN[i],player:2}); else ng.pressUp({button:LS_BTN[i],player:2}); }catch(e){ if(!ST.pressErr){ ST.pressErr=1; stLog('กดปุ่ม P2 ในเกมไม่ได้: '+(e.message||e),'err'); } } } }
     }
 
     // ----- P2: รับภาพ -----
@@ -226,9 +229,11 @@
       if(stRole()!==2) return;
       var b=lsBits(), now=performance.now();
       if(b===ST.lastBits&&now-ST.lastSend<90) return;
-      ST.lastBits=b; ST.lastSend=now; var msg={b:b,s:++ST.seq};
-      if(ST.dc&&ST.dc.readyState==='open'){ try{ ST.dc.send(JSON.stringify(msg)); return; }catch(_){ } }
-      lsSendRaw({t:'si',p:2,b:b,s:msg.s}); // สำรอง: ผ่าน Worker
+      var changed=(b!==ST.lastBits);
+      ST.lastBits=b; ST.lastSend=now; var msg={b:b,s:++ST.seq}; ST.outCount++;
+      if(ST.dc&&ST.dc.readyState==='open'){ try{ ST.dc.send(JSON.stringify(msg)); ST.outPath='ตรง'; return; }catch(_){ } }
+      if(lsSendRaw({t:'si',p:2,b:b,s:msg.s})) ST.outPath='เซิร์ฟเวอร์'; else ST.outPath='ส่งไม่ได้'; // สำรอง: ผ่าน Worker
+      if(changed&&b&&(ST.outLogged=(ST.outLogged||0)+1)<=3) stLog('ส่งปุ่มไป P1 ผ่าน'+ST.outPath+' (ช่องตรง: '+(ST.dc?ST.dc.readyState:'ไม่มี')+')','muted');
     }
 
     // ----- ข้อความจากห้อง -----
@@ -249,10 +254,10 @@
       var ping=' · ping '+Math.round(ST.rtt||LS.rtt)+' ms', route=ST.route?(' · '+ST.route):'';
       if(r===1){
         if(!ng){ br2Status('📺 โหมดส่งภาพ · คุณคือ P1 (รันเกม)\nกด "เล่นต่อ" หรือเลือกไฟล์เกม',false); return; }
-        if(ST.conn==='connected') br2Status('📺 P1 ส่งภาพอยู่'+ping+route+'\nส่ง '+(ST.encFps||0)+' fps · '+(ST.kbps||0)+' kbps'+(ST.capInfo?' · '+ST.capInfo:''),true);
+        if(ST.conn==='connected') br2Status('📺 P1 ส่งภาพอยู่'+ping+route+'\nส่ง '+(ST.encFps||0)+' fps · '+(ST.kbps||0)+' kbps · ปุ่ม P2 '+ST.inCount+(ST.capInfo?' · '+ST.capInfo:''),true);
         else br2Status('📺 P1 · รอ P2 เชื่อมต่อ…'+(ST.conn?' ('+ST.conn+')':''),false);
       } else {
-        if(ST.conn==='connected'){ var v=ST.video; br2Status('📺 P2 รับภาพ'+ping+route+'\nภาพ '+(v?v.videoWidth+'×'+v.videoHeight:'-')+' · '+(ST.decFps||0)+' fps · '+(ST.kbps||0)+' kbps',true); }
+        if(ST.conn==='connected'){ var v=ST.video; br2Status('📺 P2 รับภาพ'+ping+route+'\nภาพ '+(v?v.videoWidth+'×'+v.videoHeight:'-')+' · '+(ST.decFps||0)+' fps · '+(ST.kbps||0)+' kbps\nส่งปุ่ม '+ST.outCount+(ST.outPath?' ('+ST.outPath+')':''),true); }
         else if(ST.conn==='failed') br2Status('📺 P2 · เชื่อมต่อตรงไม่ได้\nเน็ตมือถืออาจบล็อก — ลองใช้ Wi-Fi (กำลังลองใหม่…)',false);
         else br2Status('📺 โหมดส่งภาพ · คุณคือ P2\nกำลังเชื่อมต่อกับ P1…'+(ST.conn?' ('+ST.conn+')':''),false);
       }
