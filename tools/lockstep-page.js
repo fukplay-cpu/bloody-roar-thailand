@@ -103,7 +103,7 @@
       document.body.appendChild(b); RS.btn=b;
       // ปุ่มดูบันทึกระหว่างเล่น (หน้าจอบันทึกปกติจะถูกซ่อนตอนเข้าเกม)
       var lb=document.createElement('button'); lb.type='button'; lb.textContent='📋 บันทึก';
-      lb.style.cssText=b.style.cssText.replace('+ 72px','+ 112px');
+      lb.style.cssText=b.style.cssText.replace('+ 72px',(typeof ST!=='undefined'&&ST.on)?'+ 72px':'+ 112px');
       var panel=document.createElement('div'), timer=null;
       panel.style.cssText='position:fixed;z-index:99999;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 152px);max-height:55vh;overflow:auto;padding:10px;border:1px solid #64748b;border-radius:10px;background:#0b1018f2;color:#e2e8f0;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;display:none';
       function fill(){
@@ -124,7 +124,13 @@
     }
     function br2Send(data){var ws=LS.ws;if(ws&&ws.readyState===WebSocket.OPEN){try{ws.send(JSON.stringify(data));return true;}catch(_){}}return false;}
     // ปุ่มจากจอสัมผัส: เก็บสถานะไว้เท่านั้น จะถูกส่งเข้าเกมผ่านระบบล็อกเฟรม
-    function br2Input(button,pressed){ if(pressed) lsHeld[button]=true; else delete lsHeld[button]; }
+    function br2Input(button,pressed){
+      if(pressed) lsHeld[button]=true; else delete lsHeld[button];
+      if(typeof ST!=='undefined'&&ST.on){
+        if(stRole()===1){ try{ if(ng){ if(pressed) ng.pressDown({button:button,player:1}); else ng.pressUp({button:button,player:1}); } }catch(_){ } }
+        else stSendInput();
+      }
+    }
     function br2ReleaseRemote(){}
     window.__br2Press=function(b,on){ br2Input(b,on); };
     function lsBits(){var b=0;for(var i=0;i<LS_BTN.length;i++){if(lsHeld[LS_BTN[i]])b|=(1<<i);}return b;}
@@ -139,6 +145,7 @@
       return String(romId)+'|'+size+'|'+bios;
     }
     function lsShow(){
+      if(typeof ST!=='undefined'&&ST.on){ stShow(); return; }
       if(!br2Online.role){ br2Status('ห้อง '+br2Online.room+' · กำลังเชื่อมต่อ…',false); return; }
       var who='คุณคือ P'+br2Online.role;
       if(LS.error){ br2Status('ห้อง '+br2Online.room+' · '+who+'\n'+LS.error,false); return; }
@@ -194,6 +201,7 @@
     function lsSendReady(ask){ if(LS.myReady) lsSendRaw({t:'rdy',p:br2Online.role,fp:LS.fp,ask:!!ask}); }
     // เรียกหลัง Nostalgist.launch สำเร็จ: ผูกหน่วยความจำร่วมเข้ากับเธรดของตัวเกม
     window.__br2AfterLaunch=function(){
+      if(ST.on){ stLog('เปิดเกมแล้ว — รอ P2 เชื่อมต่อ','ok'); lsShow(); return; }
       try{
         if(!window.crossOriginIsolated||typeof SharedArrayBuffer==='undefined') throw new Error('เบราว์เซอร์นี้ไม่รองรับ SharedArrayBuffer (ต้องเปิดผ่านเว็บไซต์ ไม่ใช่ไฟล์ในเครื่อง)');
         var M=ng.getEmscriptenModule(), emu=ng.getEmulator();
@@ -242,7 +250,9 @@
       var d; try{ d=JSON.parse(ev.data); }catch(_){ return; }
       if(d.t){
         if(d.p===br2Online.role) return;
-        if(rsOnMessage(d)) return;
+        if(ST.on){ if(stOnMessage(d)) return; }
+        else if(d.t==='sh'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดส่งภาพ"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return; }
+        else if(rsOnMessage(d)) return;
         if(d.t==='i'){ if(typeof d.f==='number'&&LS.remote[d.f]===undefined&&d.f>LS.avail) LS.remote[d.f]=d.b|0; lsPump(); }
         else if(d.t==='rdy'){ LS.peerFp=String(d.fp||''); if(d.ask) lsSendReady(false); lsTryStart(); lsShow(); }
         else if(d.t==='ping'){ lsSendRaw({t:'pong',p:br2Online.role,ts:d.ts}); }
@@ -255,7 +265,12 @@
         var players=Array.isArray(d.room.players)?d.room.players:[];
         var idx=players.findIndex(function(x){return x&&x.id===br2Online.playerId;});
         if(idx<0){ br2Online.role=0; LS.error='ไม่พบผู้เล่นนี้ในห้อง'; lsShow(); return; }
-        br2Online.role=idx+1; br2Online.ready=players.length===2; lsShow();
+        br2Online.role=idx+1; br2Online.ready=players.length===2;
+        if(ST.on){
+          if(br2Online.role===2&&!ST.video){ window.__br2Viewer=true; if(!ng) stViewerUi(); stHelloSoon(300); }
+          else if(br2Online.role===1&&window.__br2Viewer){ LS.error='⚠️ ลำดับผู้เล่นไม่ตรงกับหน้าห้อง\nกลับไปหน้าห้องแล้วกดเริ่มเกมใหม่'; }
+        }
+        lsShow();
       }
     }
     function lsConnect(){
@@ -278,6 +293,7 @@
       var dl=parseInt(q.get('delay')||'',10); if(dl>=1&&dl<=15){ LS.delay=dl; LS.fixedDelay=true; }
       if(!/^[A-Z0-9]{6}$/.test(br2Online.room)||!br2Online.playerId){ br2Status('หน้านี้สำหรับเล่นออนไลน์\nกรุณาเข้าผ่านหน้า "ห้องออนไลน์"',false); return; }
       lsConnect(); rsMakeButton();
+      if(ST.on){ if(RS.btn) RS.btn.style.display='none'; stStart(); return; }
       LS.pumpTimer=setInterval(lsPump,4);
       setInterval(function(){ lsSendRaw({t:'ping',p:br2Online.role,ts:performance.now()}); lsShow(); },1000);
       // บันทึกวิเคราะห์: จำนวนครั้งที่ตัวเกมอ่านปุ่มต่อ 1 เฟรมล็อก (ปกติควรเท่ากันทุกเฟรม)

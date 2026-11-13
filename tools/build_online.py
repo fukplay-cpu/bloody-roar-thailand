@@ -18,6 +18,8 @@ What it changes:
      afterwards; iOS 17 and older start at 384 MB ("Out of memory" on iPhone).
   4. Disc files downloaded into OPFS are read through a Worker sync handle
      (tools/opfs-reader.js) — iOS 17 Safari fails on getFile().slice().
+Stream mode (?mode=stream, tools/stream-page.js): P1 runs the game and sends
+video+audio to P2 over WebRTC; P2 only sends button presses back.
 Resync after a network stall is handled in tools/lockstep-page.js.
 """
 import base64
@@ -31,6 +33,7 @@ OUT = ROOT / "play-online.html"
 PRELUDE = (ROOT / "tools" / "lockstep-core-prelude.js").read_text(encoding="utf-8")
 PAGE_JS = (ROOT / "tools" / "lockstep-page.js").read_text(encoding="utf-8")
 OPFS_READER = (ROOT / "tools" / "opfs-reader.js").read_text(encoding="utf-8")
+STREAM_JS = (ROOT / "tools" / "stream-page.js").read_text(encoding="utf-8")
 
 
 def replace_once(text, old, new, label):
@@ -142,7 +145,15 @@ def main():
     start = html.index("// ---------- BR2 online input bridge")
     end_marker = "br2ConnectFromUrl();"
     end = html.index(end_marker, start) + len(end_marker)
-    html = html[:start] + PAGE_JS.strip() + html[end:]
+    page_js = PAGE_JS.strip()
+    # stream mode (tools/stream-page.js) goes right before the final br2ConnectFromUrl() call
+    assert page_js.endswith("br2ConnectFromUrl();")
+    page_js = page_js[: -len("br2ConnectFromUrl();")] + STREAM_JS.strip() + "\n    br2ConnectFromUrl();"
+    html = html[:start] + page_js + html[end:]
+    # stream-mode viewer (P2) never opens the game
+    for fn in ("async function resumeFromStored(id){", "async function handleFiles(fileList){",
+               "async function launchDisc(mainFile, u8, extraFiles){", "async function launchMulti(discList){"):
+        html = replace_once(html, fn, fn + " if(window.__br2Viewer) return;", "viewer block " + fn[:30])
 
     # hook right after the emulator has launched
     n = html.count("ng=await Nostalgist.launch(opts);")
