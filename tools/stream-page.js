@@ -208,11 +208,11 @@
       setInterval(stSendInput,100); // ส่งซ้ำเผื่อหาย
       stViewerKeys();
       var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
-      if(!coarse) stLog('เล่นบนคอม: ลูกศร=ทิศทาง · Z=✕ X=○ A=□ S=△ · Q/W=L1/R1 · 1/2=L2/R2 · Enter=Start · Shift ขวา=Select · หรือเสียบจอย','ok');
+      if(!coarse) stLog('เล่นบนคอม: ลูกศร=ทิศทาง · Z=✕ S=○ X=□ A=△ · Q/W=L1/R1 · 1/2=L2/R2 · Enter=Start · Shift ขวา=Select · หรือเสียบจอย','ok');
     }
     // ----- P2 บนคอม: คีย์บอร์ดและจอย (ไม่มีปุ่มบนจอเพราะไม่ใช่จอสัมผัส) -----
-    // ปุ่มคีย์บอร์ดเหมือน P1: ลูกศร = ทิศทาง, Z=✕ X=○ A=□ S=△, Q=L1 W=R1, 1=L2 2=R2, Enter=Start, Shift ขวา=Select
-    var ST_KEYS={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',KeyZ:'b',KeyX:'a',KeyA:'y',KeyS:'x',
+    // ปุ่มคีย์บอร์ดเหมือน P1: ลูกศร = ทิศทาง, Z=✕ S=○ X=□ A=△, Q=L1 W=R1, 1=L2 2=R2, Enter=Start, Shift ขวา=Select
+    var ST_KEYS={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',KeyZ:'b',KeyS:'a',KeyX:'y',KeyA:'x',
       KeyQ:'l',KeyW:'r',Digit1:'l2',Digit2:'r2',Enter:'start',NumpadEnter:'start',ShiftRight:'select'};
     function stViewerKeys(){
       function on(e,down){
