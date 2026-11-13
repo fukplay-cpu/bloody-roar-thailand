@@ -3668,7 +3668,7 @@ try {
     function rsMakeButton(){
       if(RS.btn) return;
       var b=document.createElement('button'); b.type='button'; b.textContent='🔄 ซิงก์ภาพ';
-      b.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 72px);padding:6px 10px;border:1px solid #64748b;border-radius:9px;background:#101722e0;color:#f8fafc;font:12px -apple-system,BlinkMacSystemFont,sans-serif';
+      b.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 112px);padding:6px 10px;border:1px solid #64748b;border-radius:9px;background:#101722e0;color:#f8fafc;font:12px -apple-system,BlinkMacSystemFont,sans-serif';
       b.addEventListener('click',function(e){ e.preventDefault(); if(!LS.started||RS.active) return; log('ซิงก์ภาพ: กดเอง','ok'); rsRequest(); });
       document.body.appendChild(b); RS.btn=b;
     }
@@ -3702,7 +3702,8 @@ try {
       if(RS.active){ br2Status(who+' · 🔄 กำลังซิงก์ภาพให้ตรงกัน…\n(รอสักครู่ เกมจะเดินต่อเอง)',false); return; }
       var F=LS.B?Atomics.load(LS.B,1):0;
       var waiting=LS.avail<F;
-      br2Status(who+' · เฟรม '+F+'\nping '+Math.round(LS.rtt)+' ms · หน่วง '+LS.delay+' เฟรม'+(waiting?'\n⏳ รอข้อมูลจากอีกเครื่อง…':''),!waiting);
+      var B=LS.B, diag=B?('\nตรวจ 0:'+B[9]+' 1:'+B[10]+' 2:'+B[11]+' 3+:'+B[12]+' · ค้าง '+(LS.stallCount||0)+' ครั้ง'+(LS.lastStall?' ('+LS.lastStall+')':'')):'';
+      br2Status(who+' · เฟรม '+F+'\nping '+Math.round(LS.rtt)+' ms · หน่วง '+LS.delay+' เฟรม'+diag+(waiting?'\n⏳ รอข้อมูลจากอีกเครื่อง…':''),!waiting);
     }
     function lsPump(){
       if(!LS.started||!LS.B) return;
@@ -3711,7 +3712,7 @@ try {
       if(!RS.active){
         if(LS.avail<F){ if(!LS.waitSince) LS.waitSince=performance.now(); }
         else if(LS.waitSince){ var stalled=performance.now()-LS.waitSince; LS.waitSince=0;
-          if(stalled>=150){ try{ log('Lockstep: เกมหยุดรออีกเครื่อง '+Math.round(stalled)+' ms ที่เฟรม '+F,'muted'); }catch(_){ } }
+          if(stalled>=150){ LS.stallCount=(LS.stallCount||0)+1; LS.lastStall=Math.round(stalled)+' ms @'+F; try{ log('Lockstep: เกมหยุดรออีกเครื่อง '+Math.round(stalled)+' ms ที่เฟรม '+F,'muted'); }catch(_){ } }
           if(stalled>=RS_STALL_MS&&Date.now()-RS.lastDone>RS_COOLDOWN_MS){ try{ log('Lockstep: ค้างรออีกเครื่อง '+Math.round(stalled)+' ms → ซิงก์ภาพใหม่','err'); }catch(_){ } rsRequest(); } }
       }
       var cap=RS.active?RS.k-1:Infinity;
