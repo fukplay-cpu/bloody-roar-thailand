@@ -3671,6 +3671,21 @@ try {
       b.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 72px);padding:6px 10px;border:1px solid #64748b;border-radius:9px;background:#101722e0;color:#f8fafc;font:12px -apple-system,BlinkMacSystemFont,sans-serif';
       b.addEventListener('click',function(e){ e.preventDefault(); if(!LS.started||RS.active) return; log('ซิงก์ภาพ: กดเอง','ok'); rsRequest(); });
       document.body.appendChild(b); RS.btn=b;
+      // ปุ่มดูบันทึกระหว่างเล่น (หน้าจอบันทึกปกติจะถูกซ่อนตอนเข้าเกม)
+      var lb=document.createElement('button'); lb.type='button'; lb.textContent='📋 บันทึก';
+      lb.style.cssText=b.style.cssText.replace('+ 72px','+ 112px');
+      var panel=document.createElement('div'), timer=null;
+      panel.style.cssText='position:fixed;z-index:99999;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 152px);max-height:55vh;overflow:auto;padding:10px;border:1px solid #64748b;border-radius:10px;background:#0b1018f2;color:#e2e8f0;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;display:none';
+      function fill(){
+        var lines=[]; try{ var src=document.getElementById('log'); if(src) for(var i=0;i<src.children.length;i++) lines.push(src.children[i].textContent); }catch(_){ }
+        var B=LS.B, head='P'+br2Online.role+' · เฟรม '+(B?Atomics.load(B,1):'-')+' · ping '+Math.round(LS.rtt||0)+' ms · หน่วง '+LS.delay+' เฟรม\n';
+        if(B) head+='อ่านปุ่ม/เฟรม 0:'+B[9]+' 1:'+B[10]+' 2:'+B[11]+' 3+:'+B[12]+' · เปลี่ยน '+B[14]+' ครั้ง (ล่าสุดเฟรม '+B[15]+')\n';
+        panel.textContent=head+'────────\n'+lines.slice(-40).join('\n');
+      }
+      lb.addEventListener('click',function(e){ e.preventDefault();
+        var open=panel.style.display==='none'; panel.style.display=open?'block':'none';
+        if(timer){ clearInterval(timer); timer=null; } if(open){ fill(); panel.scrollTop=panel.scrollHeight; timer=setInterval(fill,1000); } });
+      document.body.appendChild(lb); document.body.appendChild(panel);
     }
     function br2Status(message,ok){
       var el=br2Online.status;
