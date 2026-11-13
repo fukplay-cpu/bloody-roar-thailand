@@ -183,7 +183,7 @@
       v.style.cssText='position:fixed;z-index:2;background:#000;object-fit:contain;pointer-events:none';
       document.body.appendChild(v); ST.video=v;
       var coarseUi=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
-      try{ var pd=document.getElementById('pad'); if(pd&&coarseUi) pd.classList.add('show'); }catch(_){ } // บนคอมไม่ต้องมีปุ่มบนจอ (ใช้คีย์บอร์ด/จอย)
+      try{ var pd=document.getElementById('pad'); if(pd&&coarseUi&&!window.__br2PadHidden) pd.classList.add('show'); }catch(_){ } // บนคอมไม่ต้องมีปุ่มบนจอ (ใช้คีย์บอร์ด/จอย)
       function place(){
         var s=document.getElementById('screen'), r=s?s.getBoundingClientRect():null, vw=window.innerWidth, vh=window.innerHeight;
         if(!r||r.width<80||r.height<60){ // ยังไม่ได้เปิดเกมในเครื่องนี้ canvas อาจมีขนาด 0 → วางวิดีโอเองเต็มความกว้าง

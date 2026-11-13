@@ -3990,7 +3990,7 @@ void main()
           try{ localStorage.setItem('psx_sticks', sticksOn?'1':'0'); }catch(_){ } applyDs(); });
         applyDs();
       }
-      var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse) pad.classList.add('show'); applyPadLayout();
+      var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse&&!window.__br2PadHidden) pad.classList.add('show'); applyPadLayout();
     }
     // Custom controller editor. Layout is stored per device; D-Pad is intentionally one movable/resizable group.
     var padLayoutKey='br2_controller_layout_v1', padLayout={}, padEditActive=false, padDrag=null;
@@ -4032,6 +4032,21 @@ void main()
     }
     function openPadEditor(){if(!pad.classList.contains('show'))pad.classList.add('show');buildPadIfNeeded();setupPadEditor();padEditActive=true;pad.classList.add('edit-mode');pad.setAttribute('aria-hidden','false');document.getElementById('pad-editor').hidden=false;applyPadLayout();}
     function buildPadIfNeeded(){if(!pad.querySelector('[data-layout-id]'))buildPad();}
+    // ---------- BR2: ต่อจอยแล้วซ่อนปุ่มบนจอ ----------
+    // กดปุ่มบนจอยครั้งแรก → ซ่อนปุ่มบนจอ (จะได้ไม่บังภาพเกม)
+    // แตะจอ (นอกแถบเมนู) หรือถอดจอย → ปุ่มบนจอกลับมา
+    (function(){
+      function anyPad(){ try{ var g=navigator.getGamepads?navigator.getGamepads():[]; for(var i=0;i<g.length;i++) if(g[i]&&g[i].connected) return true; }catch(_){ } return false; }
+      function hidePad(){ if(window.__br2PadHidden) return; window.__br2PadHidden=true; try{ pad.classList.remove('show'); setTimeout(fit,30); }catch(_){ } try{ log('เจอจอย → ซ่อนปุ่มบนจอ (แตะจอเพื่อเอากลับมา)','ok'); }catch(_){ } }
+      function showPad(){ if(!window.__br2PadHidden) return; window.__br2PadHidden=false;
+        var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
+        try{ if(coarse&&pad.querySelector('[data-layout-id]')){ pad.classList.add('show'); setTimeout(fit,30); } }catch(_){ } }
+      window.addEventListener('gamepadconnected',hidePad);
+      window.addEventListener('gamepaddisconnected',function(){ setTimeout(function(){ if(!anyPad()) showPad(); },100); });
+      // Safari บางรุ่นไม่ส่ง gamepadconnected จนกว่าจะกดปุ่ม → เช็กเองเป็นระยะ
+      setInterval(function(){ if(!window.__br2PadHidden&&anyPad()){ try{ var g=navigator.getGamepads(); for(var i=0;i<g.length;i++){ var p=g[i]; if(p&&p.connected&&p.buttons.some(function(b){ return b.pressed; })){ hidePad(); break; } } }catch(_){ } } },500);
+      window.addEventListener('touchstart',function(e){ var t=e.target; if(window.__br2PadHidden&&!(t&&t.closest&&t.closest('#bar'))) showPad(); },{passive:true});
+    })();
     function closePadEditor(){padEditActive=false;pad.classList.remove('edit-mode');document.getElementById('pad-editor').hidden=true;releaseAll();}
     function installPadDrag(){
       pad.addEventListener('pointerdown',function(e){
