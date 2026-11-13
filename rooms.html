@@ -349,6 +349,11 @@ footer {
 🔒 รอผู้เล่นครบ 2 คน
 </button>
 
+<label class="start-info" style="display:flex;gap:8px;align-items:center;justify-content:center;cursor:pointer">
+<input type="checkbox" id="streamMode" checked>
+📺 โหมดส่งภาพ (แนะนำ) — เครื่อง P1 รันเกมแล้วส่งภาพให้ P2 · ภาพตรงกันเสมอ · P2 ไม่ต้องโหลดเกม
+</label>
+
 <div class="start-info" id="startInfo">
 เมื่อผู้เล่นครบ 2 คน สามารถกดเริ่มเกมได้
 </div>
@@ -387,6 +392,14 @@ let socket = null;
 let activeRoomCode = "";
 let activePlayerId = "";
 let busy = false;
+
+/* remember the stream-mode choice */
+window.addEventListener("DOMContentLoaded", () => {
+  const box = document.getElementById("streamMode");
+  if (!box) return;
+  try { const v = localStorage.getItem("br2_stream_mode"); if (v !== null) box.checked = v === "1"; } catch (_) {}
+  box.addEventListener("change", () => { try { localStorage.setItem("br2_stream_mode", box.checked ? "1" : "0"); } catch (_) {} });
+});
 let gameStarted = false;
 let launchTimer = null;
 
@@ -743,7 +756,11 @@ const ws = new WebSocket(wsURL.toString());
    UPDATE PLAYERS
 ================================= */
 
+let lastPlayers = [];
+
 function updatePlayers(players) {
+
+  lastPlayers = players;
 
   $("player1").textContent =
     players[0]?.name || "รอผู้เล่น";
@@ -930,6 +947,13 @@ function launchFix6() {
     "online",
     "1"
   );
+
+  // โหมดส่งภาพ: ทั้งสองเครื่องต้องเลือกเหมือนกัน (ค่าเริ่มต้น = ส่งภาพ)
+  if ($("streamMode") && $("streamMode").checked) {
+    gameURL.searchParams.set("mode", "stream");
+    const idx = lastPlayers.findIndex(p => p && p.id === activePlayerId);
+    if (idx >= 0) gameURL.searchParams.set("role", String(idx + 1));
+  }
 
   window.location.href = gameURL.toString();
 }
