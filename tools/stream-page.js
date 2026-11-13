@@ -87,11 +87,21 @@
       // วาดภาพเกมลง canvas สำเนาทุกเฟรม แล้วส่ง canvas สำเนา (canvas ของตัวเกมวาดจากอีกเธรด)
       var cv=document.createElement('canvas'); cv.width=640; cv.height=480; ST.cv=cv;
       var cx=cv.getContext('2d',{alpha:false});
+      // ทางหลัก: ให้เธรดของตัวเกมจับภาพจาก OffscreenCanvas แล้วส่งมาเป็น ImageBitmap
+      // (Safari ไม่ยอมให้หน้าเว็บอ่าน canvas ของเกมโดยตรง)
+      globalThis.__br2OnFrame=function(bmp,err){
+        if(err){ stLog('จับภาพในเธรดเกมไม่ได้: '+err,'err'); return; }
+        if(!bmp) return;
+        try{ if(cv.width!==bmp.width||cv.height!==bmp.height){ cv.width=bmp.width; cv.height=bmp.height; } cx.drawImage(bmp,0,0); ST.frames++; ST.grabbed++; ST.grabAt=performance.now(); }catch(_){ }
+        try{ bmp.close(); }catch(_){ }
+      };
+      globalThis.__br2OnInfo=function(m){ stLog('เธรดเกม: '+m,'muted'); };
+      ST.grabbed=0;
       function draw(){
         ST.raf=requestAnimationFrame(draw);
-        if(ST.useDirect) return;
+        if(ST.useDirect||performance.now()-(ST.grabAt||0)<500) return;
         try{
-          var s=document.getElementById('screen'); if(!s||!s.width) return;
+          var s=stGameCanvas(); if(!s||!s.width) return;
           var w=Math.min(640,s.width), h=Math.round(w*s.height/s.width)||480;
           if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
           cx.drawImage(s,0,0,w,h); ST.frames++;
@@ -102,12 +112,15 @@
       ST.media=ms; stAddAudio();
       // ตรวจว่าวาดสำเนาได้จริง (ไม่ดำล้วน) — ถ้าไม่ได้ ลองส่ง canvas ของเกมตรงๆ
       function check(){
+        ST.checks=(ST.checks||0)+1;
         try{
           if(ST.useDirect){ ST.capInfo='จับภาพตรง'; return; }
+          if(performance.now()-(ST.grabAt||0)<1000){ var t='มีภาพ '+cv.width+'×'+cv.height+' (เธรดเกม)'; if(t!==ST.capInfo){ ST.capInfo=t; stLog('ภาพที่จับได้: '+t,'ok'); } return; }
           var px=cx.getImageData(0,0,cv.width,cv.height).data, lit=0;
           for(var i=0;i<px.length;i+=4*97){ if(px[i]+px[i+1]+px[i+2]>30) lit++; }
-          if(lit===0){
-            var s=document.getElementById('screen');
+          if(lit===0&&!ST.grabTried){ ST.grabTried=true; stGrab(true); } // สำรอง: ให้เธรดของเกมจับภาพเอง
+          if(lit===0&&ST.grabTried&&ST.grabbed===0&&ST.checks>2){
+            var s=stGameCanvas();
             if(s&&s.captureStream){
               var direct=s.captureStream(60), vt=direct.getVideoTracks()[0];
               if(vt){ ST.useDirect=true; ms.getVideoTracks().forEach(function(t){ ms.removeTrack(t); t.stop(); }); ms.addTrack(vt);
@@ -121,6 +134,19 @@
       }
       setTimeout(check,3000); setInterval(check,5000);
       return ms;
+    }
+    // canvas ของตัวเกม (Emscripten เปลี่ยน id จาก "screen" เป็น "canvas" ตอนเปิดเกม)
+    function stGameCanvas(){
+      try{ var c=ng&&ng.getCanvas&&ng.getCanvas(); if(c) return c; }catch(_){ }
+      return document.getElementById('screen')||document.querySelector('#stage canvas')||document.querySelector('canvas');
+    }
+    function stGrab(on){
+      var n=0;
+      globalThis.__br2Grab=!!on; globalThis.__br2GrabW=640; // ถ้าลูปของเกมรันบนเธรดหลัก
+      globalThis.__br2Deliver=function(d){ if(d.info){ if(globalThis.__br2OnInfo) globalThis.__br2OnInfo(d.info); return; } if(globalThis.__br2OnFrame) globalThis.__br2OnFrame(d.bmp,d.err); };
+      try{ var M=ng&&ng.getEmscriptenModule(), PT=M&&M.__br2PThread;
+        if(PT){ [].concat(PT.runningWorkers||[],PT.unusedWorkers||[]).forEach(function(w){ try{ w.postMessage({cmd:'br2grab',on:!!on,w:640}); n++; }catch(_){ } }); } }catch(_){ }
+      stLog((on?'เปิด':'ปิด')+'การจับภาพในเธรดเกม (threads '+n+')','muted');
     }
     async function stHostOffer(){
       if(!ng){ stLog('ยังไม่ได้เปิดเกม — รอเกมเปิดก่อน','muted'); return; }
@@ -246,6 +272,7 @@
           ST.route=relay?'ผ่านเซิร์ฟเวอร์':'เชื่อมตรง'; }
       }catch(_){ }
     }
+    window.__br2Stream={ST:ST,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
     function stStart(){
       stLog('เริ่มโหมดส่งภาพ (P'+(ST.hint||'?')+')','ok');
       if(window.__br2Viewer) stViewerUi();
