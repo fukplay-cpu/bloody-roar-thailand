@@ -304,13 +304,6 @@ def main():
         "if(hdOn&&!window.__br2Lockstep) c.pcsx_rearmed_neon_enhancement_enable='enabled'; return c; }",
         "hd off online",
     )
-    # keyboard layout for the face buttons (asked by the player): Z=✕ S=○ X=□ A=△
-    html = replace_once(
-        html,
-        "input_player1_b:'z',input_player1_a:'x',input_player1_y:'a',input_player1_x:'s',",
-        "input_player1_b:'z',input_player1_a:'s',input_player1_y:'x',input_player1_x:'a',",
-        "face keys",
-    )
     html = replace_once(html, "<title>", "<title>BR2 Online · ", "title")
 
     OUT.write_text(html, encoding="utf-8")
