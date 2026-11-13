@@ -181,7 +181,11 @@
       try{ if(typeof fit==='function'){ fit(); setTimeout(fit,200); } }catch(_){ }
       var v=document.createElement('video'); v.setAttribute('playsinline',''); v.setAttribute('webkit-playsinline',''); v.autoplay=true; v.muted=true;
       v.style.cssText='position:fixed;z-index:2;background:#000;object-fit:contain;pointer-events:none';
-      document.body.appendChild(v); ST.video=v;
+      // ใส่วิดีโอไว้ในชั้นเดียวกับจอเกม (#stage) ใต้ปุ่มควบคุม (#pad) — ถ้าใส่ไว้ที่ body วิดีโอจะทับปุ่มทั้งหมด
+      var stage=document.getElementById('stage'), padEl=document.getElementById('pad');
+      if(stage){ v.style.zIndex='1'; if(padEl&&padEl.parentElement===stage) stage.insertBefore(v,padEl); else stage.appendChild(v); }
+      else document.body.appendChild(v);
+      ST.video=v;
       var coarseUi=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
       try{ var pd=document.getElementById('pad'); if(pd&&coarseUi) pd.classList.add('show'); }catch(_){ } // บนคอมไม่ต้องมีปุ่มบนจอ (ใช้คีย์บอร์ด/จอย)
       function place(){
