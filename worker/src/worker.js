@@ -192,6 +192,32 @@ export default {
         gameSaves: !!env.GAME_SAVES
       }), request);
     }
+    // TURN (Cloudflare Realtime) สำหรับโหมดส่งภาพ: ใช้เมื่อสองเครื่องเชื่อมตรงกันไม่ได้ (เน็ตมือถือบางเจ้า)
+    // ต้องตั้งค่า secret ใน Worker: TURN_KEY_ID และ TURN_KEY_API_TOKEN
+    if (request.method === "GET" && url.pathname === "/turn") {
+      if (!env.TURN_KEY_ID || !env.TURN_KEY_API_TOKEN) {
+        return withCors(json({ configured: false, iceServers: [] }), request);
+      }
+      try {
+        const r = await fetch(
+          "https://rtc.live.cloudflare.com/v1/turn/keys/" + env.TURN_KEY_ID + "/credentials/generate-ice-servers",
+          {
+            method: "POST",
+            headers: { Authorization: "Bearer " + env.TURN_KEY_API_TOKEN, "Content-Type": "application/json" },
+            body: JSON.stringify({ ttl: 86400 })
+          }
+        );
+        if (!r.ok) {
+          return withCors(json({ configured: true, error: "turn api " + r.status, iceServers: [] }, 502), request);
+        }
+        const data = await r.json();
+        let ice = data.iceServers || [];
+        if (!Array.isArray(ice)) ice = [ice];
+        return withCors(json({ configured: true, iceServers: ice }), request);
+      } catch (e) {
+        return withCors(json({ configured: true, error: String(e), iceServers: [] }, 502), request);
+      }
+    }
     // ดาวน์โหลดจุดเซฟจาก R2
     if (
       request.method === "GET" &&

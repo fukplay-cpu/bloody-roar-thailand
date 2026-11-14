@@ -3939,6 +3939,21 @@ try {
       try{ if(ST.dc) ST.dc.close(); }catch(_){ } try{ if(ST.pc) ST.pc.close(); }catch(_){ }
       ST.pc=null; ST.dc=null; ST.conn=''; ST.route='';
     }
+    // ขอ TURN จาก Worker (ถ้าตั้งค่าไว้) — ใช้ส่งต่อภาพเมื่อสองเครื่องเชื่อมตรงกันไม่ได้
+    function stLoadTurn(){
+      if(ST.turnP) return ST.turnP;
+      ST.turnP=(async function(){
+        try{
+          var ctl=('AbortController' in window)?new AbortController():null; var t=setTimeout(function(){ try{ ctl&&ctl.abort(); }catch(_){ } },4000);
+          var r=await fetch(new URL('/turn',br2Online.worker).href,{cache:'no-store',signal:ctl?ctl.signal:undefined}); clearTimeout(t);
+          var d=await r.json();
+          if(d&&Array.isArray(d.iceServers)&&d.iceServers.length){ ST.ice=ST.ice.concat(d.iceServers); ST.turnOk=true; stLog('มีเซิร์ฟเวอร์ TURN สำรอง (ใช้เมื่อเชื่อมตรงไม่ได้)','ok'); }
+          else if(d&&d.configured===false){ ST.turnOk=false; stLog('ยังไม่ได้ตั้งค่า TURN ใน Worker — ถ้าเชื่อมตรงไม่ได้จะต่อไม่ติด','muted'); }
+          else stLog('ขอ TURN ไม่สำเร็จ: '+((d&&d.error)||r.status),'err');
+        }catch(e){ stLog('ขอ TURN ไม่สำเร็จ: '+(e.message||e),'err'); }
+      })();
+      return ST.turnP;
+    }
     function stNewPc(){
       stClosePc();
       var pc=new RTCPeerConnection({iceServers:ST.ice,bundlePolicy:'max-bundle'});
@@ -4026,6 +4041,7 @@ try {
     }
     async function stHostOffer(){
       if(!ng){ stLog('ยังไม่ได้เปิดเกม — รอเกมเปิดก่อน','muted'); return; }
+      await stLoadTurn();
       var ms=stHostMedia(), pc=stNewPc();
       ms.getTracks().forEach(function(t){ var snd=pc.addTrack(t,ms);
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
@@ -4127,6 +4143,7 @@ try {
       lsSendRaw({t:'sh',p:2,v:1}); stHelloSoon(4000);
     }
     async function stViewerAnswer(offer){
+      await stLoadTurn();
       var pc=stNewPc();
       pc.ontrack=function(e){
         var v=ST.video; if(!v) return;
@@ -4176,7 +4193,7 @@ try {
         else br2Status('📺 P1 · รอ P2 เชื่อมต่อ…'+(ST.conn?' ('+ST.conn+')':''),false);
       } else {
         if(ST.conn==='connected'){ var v=ST.video; br2Status('📺 P2 รับภาพ'+ping+route+'\nภาพ '+(v?v.videoWidth+'×'+v.videoHeight:'-')+' · '+(ST.decFps||0)+' fps · '+(ST.kbps||0)+' kbps\nส่งปุ่ม '+ST.outCount+(ST.outPath?' ('+ST.outPath+')':''),true); }
-        else if(ST.conn==='failed') br2Status('📺 P2 · เชื่อมต่อตรงไม่ได้\nเน็ตมือถืออาจบล็อก — ลองใช้ Wi-Fi (กำลังลองใหม่…)',false);
+        else if(ST.conn==='failed') br2Status('📺 P2 · เชื่อมต่อไม่ได้'+(ST.turnOk?' (แม้ผ่าน TURN)':'\nเน็ตไม่ยอมให้เชื่อมตรง และยังไม่ได้ตั้งค่า TURN')+'\nกำลังลองใหม่…',false);
         else br2Status('📺 โหมดส่งภาพ · คุณคือ P2\nกำลังเชื่อมต่อกับ P1…'+(ST.conn?' ('+ST.conn+')':''),false);
       }
     }
@@ -4214,7 +4231,7 @@ try {
       stLog('เริ่มโหมดส่งภาพ (P'+(ST.hint||'?')+')','ok');
       if(window.__br2Viewer) setTimeout(stViewerUi,0); // หลังสคริปต์ทั้งหน้าทำงานครบ (ไม่งั้นตัวแปรของ D-pad ถูกรีเซ็ต)
       setInterval(function(){ stStats(); lsShow(); },1000);
-      stHelloSoon(800);
+      stLoadTurn(); stHelloSoon(800);
     }
     br2ConnectFromUrl();
     var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
