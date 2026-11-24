@@ -116,11 +116,31 @@
         var open=panel.style.display==='none'; panel.style.display=open?'block':'none';
         if(timer){ clearInterval(timer); timer=null; } if(open){ fill(); panel.scrollTop=panel.scrollHeight; timer=setInterval(fill,1000); } });
       document.body.appendChild(lb); document.body.appendChild(panel);
+      RS.logBtn=lb; RS.logPanel=panel; RS.logClose=function(){ panel.style.display='none'; if(timer){ clearInterval(timer); timer=null; } };
+      br2StatusRender();
+    }
+    // กล่องสถานะมุมขวาบน: แตะเพื่อย่อ/ขยาย (จำค่าไว้ในเครื่อง)
+    // ย่อ = แสดงแค่ ping สั้นๆ ไม่บังจอ · ถ้ามีปัญหา (ok=false) จะขยายให้เห็นเองเสมอ
+    var br2StatusOpen=false; try{ br2StatusOpen=localStorage.getItem('br2_status_open')==='1'; }catch(_){ }
+    function br2StatusRender(){
+      var el=br2Online.status; if(!el) return;
+      var msg=el.__msg||'', ok=!!el.__ok, open=br2StatusOpen||!ok;
+      if(open){ el.textContent=msg+(ok?'\n▴ แตะเพื่อย่อ':''); el.style.maxWidth='min(62vw,300px)'; el.style.padding='7px 10px'; }
+      else{
+        var m=/ping (\d+) ms/.exec(msg), route=/ผ่านเซิร์ฟเวอร์/.test(msg)?' · TURN':'';
+        el.textContent=(m?'📶 '+m[1]+' ms'+route:(msg.split('\n')[0].slice(0,18)))+' ▾';
+        el.style.maxWidth='none'; el.style.padding='4px 9px';
+      }
+      el.style.borderColor=ok?'#22c55e':'#64748b';el.style.color=ok?'#86efac':'#f8fafc';
+      // ปุ่มซิงก์/บันทึกแสดงเฉพาะตอนขยาย
+      try{ var show=open; if(RS.btn&&!(typeof ST!=='undefined'&&ST.on)) RS.btn.style.display=show?'':'none'; if(RS.logBtn) RS.logBtn.style.display=show?'':'none'; if(!show&&RS.logPanel&&RS.logPanel.style.display!=='none'&&RS.logClose) RS.logClose(); }catch(_){ }
     }
     function br2Status(message,ok){
       var el=br2Online.status;
-      if(!el){el=document.createElement('div');el.id='br2-online-status';el.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);max-width:min(62vw,300px);padding:7px 10px;border:1px solid #64748b;border-radius:9px;background:#101722eF;color:#f8fafc;font:12px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none;text-align:right;white-space:pre-line';document.body.appendChild(el);br2Online.status=el;}
-      el.textContent=message;el.style.borderColor=ok?'#22c55e':'#64748b';el.style.color=ok?'#86efac':'#f8fafc';
+      if(!el){el=document.createElement('div');el.id='br2-online-status';el.style.cssText='position:fixed;z-index:99998;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);max-width:min(62vw,300px);padding:7px 10px;border:1px solid #64748b;border-radius:9px;background:#101722eF;color:#f8fafc;font:12px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;pointer-events:auto;cursor:pointer;-webkit-user-select:none;user-select:none;text-align:right;white-space:pre-line;touch-action:manipulation';document.body.appendChild(el);br2Online.status=el;
+        el.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); if(!el.__ok) return; br2StatusOpen=!br2StatusOpen; try{ localStorage.setItem('br2_status_open',br2StatusOpen?'1':'0'); }catch(_){ } br2StatusRender(); });
+      }
+      el.__msg=message; el.__ok=!!ok; br2StatusRender();
     }
     function br2Send(data){var ws=LS.ws;if(ws&&ws.readyState===WebSocket.OPEN){try{ws.send(JSON.stringify(data));return true;}catch(_){}}return false;}
     // ปุ่มจากจอสัมผัส: เก็บสถานะไว้เท่านั้น จะถูกส่งเข้าเกมผ่านระบบล็อกเฟรม
