@@ -131,6 +131,7 @@
       <button data-act="resetgame" title="รีเฟรชตัวเกมโดยไม่โหลดหน้าเว็บใหม่ และคงการเชื่อมต่อออนไลน์ไว้">รีเฟรชเกม</button>
       <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
         <button data-act="dot1" id="btn-dot1" title="เปิด/ปิดฟิลเตอร์จุดภาพ (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ</button>
+        <button data-act="aspect" id="btn-aspect" title="สลับภาพเกมระหว่าง 4:3 (สัดส่วนเดิม) กับยืดเต็มจอ (ใช้ได้ตอนจอแนวนอน)">ภาพ: 4:3</button>
         <button data-act="dot2" id="btn-dot2" title="ฟิลเตอร์จุดภาพ 2 เท่า — จุดใหญ่ขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ 2×</button>
         <button data-act="importstate">นำเข้าสถานะเกม</button>
         <button data-act="exportstate">ส่งออกสถานะเกม</button>
@@ -3515,6 +3516,9 @@ try {
   (function(){
     "use strict";
     var ASPECT=4/3;
+    // ยืดภาพเต็มจอ (แบบแอป Gamma): จำค่าไว้ในเครื่อง ใช้ได้ทั้ง P1 และ P2
+    window.__br2Fill=false; try{ window.__br2Fill=localStorage.getItem('br2_aspect')==='fill'; }catch(_){ }
+    setTimeout(function(){ try{ br2AspectLabel(); }catch(_){ } },0);
     var BINDS={ input_player1_up:'up',input_player1_down:'down',input_player1_left:'left',input_player1_right:'right',
       input_player1_b:'z',input_player1_a:'s',input_player1_y:'x',input_player1_x:'a',
       input_player1_l:'q',input_player1_r:'w',input_player1_l2:'1',input_player1_r2:'2',
@@ -4125,7 +4129,16 @@ void main()
       if(h>availH){h=availH;w=h*A;}
       canvas.style.setProperty('width',Math.round(w)+'px','important');
       canvas.style.setProperty('height',Math.round(h)+'px','important');
+      // โหมดเต็มจอ: ให้ตัวเกมวาดภาพ 4:3 เหมือนเดิม แล้วค่อยยืดด้วย CSS transform (เฉพาะจอแนวนอน)
+      // ถ้าเปลี่ยนขนาด canvas ตรงๆ RetroArch จะเติมขอบดำเองภายใน canvas
+      var fillOn=!!window.__br2Fill&&availW>availH;
+      canvas.style.transformOrigin='50% 50%';
+      canvas.style.transform=fillOn?('scale('+(availW/Math.round(w)).toFixed(4)+','+(availH/Math.round(h)).toFixed(4)+')'):'';
+      if(fillOn&&top>0) canvas.style.marginTop=top+'px'; else canvas.style.marginTop='';
+      br2AspectLabel();
     }
+    function br2AspectLabel(){ var b=document.getElementById('btn-aspect'); if(b) b.textContent=window.__br2Fill?'ภาพ: เต็มจอ':'ภาพ: 4:3'; }
+    function br2ToggleAspect(){ window.__br2Fill=!window.__br2Fill; try{ localStorage.setItem('br2_aspect',window.__br2Fill?'fill':'43'); }catch(_){ } fit(); setTimeout(fit,100); }
     function syncFullscreenState(){
       var active=!!(document.fullscreenElement||document.webkitFullscreenElement);
       if(!active && document.body.classList.contains('fullscreen-mode')){
@@ -4793,6 +4806,7 @@ void main()
         else if(act==='togglelog'){ logEl.classList.toggle('show'); }
         else if(act==='dot1'){ setDotMode(1); }
         else if(act==='dot2'){ setDotMode(2); }
+        else if(act==='aspect'){ br2ToggleAspect(); }
         else if(act==='hd'){ toggleHd(); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }

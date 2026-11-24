@@ -213,6 +213,10 @@
         }
         // อย่าให้วิดีโอทับแถบเมนูด้านบน
         var bar2=document.getElementById('bar'), minTop=bar2?bar2.getBoundingClientRect().bottom+6:0;
+        if(window.__br2Fill&&vw>vh){ // ยืดเต็มจอ: เต็มความกว้าง เว้นแค่แถบเมนูด้านบน
+          var t0=Math.max(0,Math.min(r.top,vh*0.25)); if(r.top<minTop) t0=Math.min(minTop,vh*0.25);
+          v.style.objectFit='fill'; v.style.left='0px'; v.style.top=t0+'px'; v.style.width=vw+'px'; v.style.height=(vh-t0)+'px'; return; }
+        v.style.objectFit='contain';
         if(r.top<minTop){ var hh=Math.min(r.height,vh-minTop-6), ww=Math.min(r.width,Math.round(hh*4/3)); hh=Math.round(ww*3/4); r={left:(vw-ww)/2,top:minTop,width:ww,height:hh}; }
         v.style.left=r.left+'px'; v.style.top=r.top+'px'; v.style.width=r.width+'px'; v.style.height=r.height+'px'; }
       place(); setInterval(place,300); window.addEventListener('resize',function(){ setTimeout(place,50); });
