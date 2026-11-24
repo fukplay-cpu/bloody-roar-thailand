@@ -3971,6 +3971,8 @@ void main()
         +'<div class="ds"><button id="ds-toggle" type="button">DualShock</button></div>'
         +'<div class="stick left" id="stickL"><span class="knob"></span></div><div class="stick right" id="stickR"><span class="knob"></span></div>';
       dpadEl=document.getElementById('dpad'); dpadPointer=null; dpadDirs={up:false,down:false,left:false,right:false};
+      // iOS Safari: กดย้ำที่ D-pad (ซึ่งไม่ใช่ปุ่ม <button>) จะซูมหน้าจอเข้าหาจุดที่กด → กันด้วยการยกเลิก touch เริ่มต้นของเบราว์เซอร์
+      ['touchstart','touchmove','touchend'].forEach(function(t){ dpadEl.addEventListener(t,function(e){ if(e.cancelable) e.preventDefault(); },{passive:false}); });
       dpadEl.addEventListener('pointerdown',function(e){ e.preventDefault(); if(dpadPointer!==null) return; dpadPointer=e.pointerId; try{dpadEl.setPointerCapture(e.pointerId);}catch(_){ } updateDpad(e); });
       dpadEl.addEventListener('pointermove',function(e){ if(e.pointerId!==dpadPointer) return; e.preventDefault(); updateDpad(e); });
       var dend=function(e){ if(e.pointerId!==dpadPointer) return; clearDpad(); };
@@ -4032,6 +4034,14 @@ void main()
     }
     function openPadEditor(){if(!pad.classList.contains('show'))pad.classList.add('show');buildPadIfNeeded();setupPadEditor();padEditActive=true;pad.classList.add('edit-mode');pad.setAttribute('aria-hidden','false');document.getElementById('pad-editor').hidden=false;applyPadLayout();}
     function buildPadIfNeeded(){if(!pad.querySelector('[data-layout-id]'))buildPad();}
+    // iOS Safari: กันการซูมจากการกดย้ำ / หยิกจอ ระหว่างเล่น (ไม่ใช่แค่ D-pad: รวมพื้นที่ปุ่มทั้งหมด)
+    (function(){
+      var lastEnd=0;
+      document.addEventListener('touchend',function(e){ var t=e.target, now=Date.now();
+        if(t&&t.closest&&t.closest('#pad')&&now-lastEnd<350&&e.cancelable) e.preventDefault(); lastEnd=now; },{passive:false});
+      document.addEventListener('dblclick',function(e){ var t=e.target; if(t&&t.closest&&t.closest('#pad,#stage')) e.preventDefault(); },{passive:false});
+      ['gesturestart','gesturechange'].forEach(function(n){ document.addEventListener(n,function(e){ var t=e.target; if(t&&t.closest&&t.closest('#pad,#stage')) e.preventDefault(); },{passive:false}); });
+    })();
     // ---------- BR2: ต่อจอยแล้วซ่อนปุ่มบนจอ ----------
     // กดปุ่มบนจอยครั้งแรก → ซ่อนปุ่มบนจอ (จะได้ไม่บังภาพเกม)
     // แตะจอ (นอกแถบเมนู) หรือถอดจอย → ปุ่มบนจอกลับมา
