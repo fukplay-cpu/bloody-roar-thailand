@@ -186,9 +186,9 @@
       <button id="continue-game" style="display:none">▶ เล่นต่อ</button>
       <button id="pick">เลือกไฟล์เกมจากเครื่อง</button>
       <button id="load-server-game" type="button" style="font:inherit;font-size:.9rem;letter-spacing:.04em;padding:.72rem 1.2rem;border-radius:10px;cursor:pointer;color:#111;background:#f1f1f1;border:1px solid #777;max-width:92%">
-        ▶ ดาวน์โหลด Bloody Roar 2 จากเซิร์ฟเวอร์
+        🔒 ดาวน์โหลดจากเซิร์ฟเวอร์ (ใส่รหัส)
       </button>
-      <p id="download-instruction" style="max-width:92%;margin:.75rem auto 1rem;color:#f0d58a;font-size:.88rem;line-height:1.65;text-align:center">กดปุ่มสีขาวเพื่อดาวน์โหลดเกมก่อน รอให้ดาวน์โหลดครบ 100% แล้วจึงเข้าเล่นเกมได้</p>
+      <p id="download-instruction" style="max-width:92%;margin:.75rem auto 1rem;color:#f0d58a;font-size:.88rem;line-height:1.65;text-align:center">ปุ่มสีขาวสำหรับเจ้าของเว็บ (ต้องใส่รหัส) · ผู้เล่นทั่วไปกด "เลือกไฟล์เกมจากเครื่อง" แล้วเลือกไฟล์เกมของตัวเอง · ถ้าเข้าห้องเป็น P2 ในโหมดส่งภาพ ไม่ต้องมีไฟล์เกม</p>
 
       <button id="clearmem" style="display:none">🗑 Vider la mémoire pour lancer un autre jeu</button>
       <div id="bios-row">BIOS: <span id="bios-state">HLE (มีในระบบ)</span> · <a id="pick-bios">เพิ่มไฟล์ scph…bin</a></div>
@@ -4528,13 +4528,21 @@ void main()
 
     // Chargement ZIP distant par plages HTTP — V4 télécharge chaque membre en blocs de 4 MiB.
     var BR2_WORKER_URL = 'https://br2-upload-gateway.fukthefuk400.workers.dev/?action=get';
+    // ปุ่มดาวน์โหลดใช้ได้เฉพาะเจ้าของ: Worker ตรวจรหัส (เก็บเป็น Secret บน Cloudflare) · เครื่องนี้จำรหัสไว้
+    var BR2_DL_KEY = 'br2_dl_key';
+    function br2DlKey(){ try{ return localStorage.getItem(BR2_DL_KEY)||''; }catch(_){ return ''; } }
+    function br2AskDlKey(again){
+      var k = window.prompt(again ? 'รหัสไม่ถูกต้อง ลองใส่ใหม่' : 'ใส่รหัสดาวน์โหลด (สำหรับเจ้าของเว็บ)', '');
+      if (k === null) return '';
+      k = String(k).trim(); try{ if(k) localStorage.setItem(BR2_DL_KEY, k); }catch(_){ } return k;
+    }
     async function br2Range(start, end, total) {
       var r, lastError;
       for (var attempt = 0; attempt < 3; attempt++) {
         try {
           r = await fetch(BR2_WORKER_URL, {
             method: 'GET',
-            headers: { 'Range': 'bytes=' + start + '-' + end },
+            headers: { 'Range': 'bytes=' + start + '-' + end, 'X-BR2-Key': br2DlKey() },
             cache: 'no-store'
           });
           break;
@@ -4547,6 +4555,7 @@ void main()
         throw new Error('เรียก Worker ไม่สำเร็จในช่วง bytes ' + start + '-' + end +
           ' หลังลอง 3 ครั้ง: ' + (lastError && lastError.message || lastError));
       }
+      if (r.status === 401) { try{ localStorage.removeItem(BR2_DL_KEY); }catch(_){ } throw new Error('รหัสดาวน์โหลดไม่ถูกต้อง'); }
       if (r.status !== 206) throw new Error('Worker ตอบ HTTP ' + r.status + ' ในช่วง bytes ' + start + '-' + end);
       var cr = r.headers.get('Content-Range') || '';
       if (!cr.startsWith('bytes ' + start + '-' + end + '/')) {
@@ -4662,6 +4671,15 @@ void main()
 
     async function br2LoadZipFromServer() {
       var btn = document.getElementById('load-server-game');
+      // ตรวจรหัสก่อนเริ่ม (ขอแค่ 1 ไบต์) → ถ้าผิดให้ใส่ใหม่ได้ 3 ครั้ง
+      for (var tryKey = 0; ; tryKey++) {
+        if (!br2DlKey() && !br2AskDlKey(tryKey > 0)) return;
+        var probe = null;
+        try { probe = await fetch(BR2_WORKER_URL, { headers: { 'Range': 'bytes=0-0', 'X-BR2-Key': br2DlKey() }, cache: 'no-store' }); } catch(_) { }
+        if (!probe || probe.status !== 401) break;
+        try{ localStorage.removeItem(BR2_DL_KEY); }catch(_){ }
+        if (tryKey >= 2) { alert('รหัสไม่ถูกต้อง · ใช้ "เลือกไฟล์จากเครื่อง" แทนได้'); return; }
+      }
       try { sessionStorage.setItem('br2_v4_last_attempt', new Date().toISOString()); } catch(_) {} br2Mark('server-load-start','เริ่มดึง ZIP จาก Cloudflare R2');
       btn.disabled = true;
       showStatus('Connexion au serveur…');
