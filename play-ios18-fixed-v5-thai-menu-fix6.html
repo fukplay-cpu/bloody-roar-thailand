@@ -174,7 +174,7 @@
       <textarea id="macro-text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="เช่น ↓ ↓ ↓ ○"></textarea>
       <div class="keys" id="macro-keys"></div>
       <div id="macro-msg"></div>
-      <p>• เว้นวรรคคั่นแต่ละจังหวะ เช่น <code>↓ ↓ ↓ ○</code><br>• กดพร้อมกันใช้ <code>+</code> เช่น <code>↓+□</code><br>• กดค้างกี่เฟรมใช้ <code>:</code> เช่น <code>□:10</code> (ปกติ 3 เฟรม)<br>• หยุดรอใช้ <code>w</code> ตามด้วยจำนวนเฟรม เช่น <code>w10</code> (1 เฟรม ≈ 1/50 วินาที)<br>• ปุ่ม: ↑ ↓ ← → ↖ ↗ ↙ ↘ □ ○ △ ✕ L1 L2 R1 R2 START SELECT<br>• ทิศซ้าย/ขวาเป็นทิศบนจอ ถ้าตัวละครหันอีกด้าน ท่าที่กด "หน้า" จะกลับทิศ</p>
+      <p>• เว้นวรรคคั่นแต่ละจังหวะ เช่น <code>↓ ↓ ↓ ○</code><br>• กดพร้อมกันใช้ <code>+</code> เช่น <code>↓+□</code><br>• กดค้างกี่เฟรมใช้ <code>:</code> เช่น <code>□:10</code> (ปกติ 3 เฟรม)<br>• กดค้างไว้ระหว่างกดปุ่มอื่น: <code>ค้าง↓</code> … <code>ปล่อย↓</code> เช่น <code>ค้าง↓ ✕ ✕ ปล่อย↓</code><br>• หยุดรอใช้ <code>w</code> ตามด้วยจำนวนเฟรม เช่น <code>w10</code> (1 เฟรม ≈ 1/50 วินาที)<br>• ปุ่ม: ↑ ↓ ← → ↖ ↗ ↙ ↘ □ ○ △ ✕ L1 L2 R1 R2 START SELECT<br>• ทิศซ้าย/ขวาเป็นทิศบนจอ ถ้าตัวละครหันอีกด้าน ท่าที่กด "หน้า" จะกลับทิศ</p>
       <footer><button type="button" id="macro-test">▶ ทดสอบ</button><button type="button" id="macro-default">ค่าเริ่มต้น</button><button type="button" id="macro-save">บันทึก</button></footer>
     </section>
     <div id="loader">
@@ -4060,9 +4060,13 @@ void main()
         var raw=toks[i], T=raw.toUpperCase();
         var mw=T.match(/^(?:W|รอ)(\d{1,3})$/);
         if(mw){ var n=Math.min(500,+mw[1]); if(steps.length) steps[steps.length-1].w+=n; else steps.push({b:[],h:0,w:n}); continue; }
-        var hold=3, mh=T.match(/^(.+?)[:：](\d{1,3})$/); if(mh){ T=mh[1]; hold=Math.max(1,Math.min(300,+mh[2])); }
+        // ค้าง↓ = กดค้างไว้ระหว่างจังหวะถัดไป · ปล่อย↓ = ปล่อยปุ่มที่ค้างไว้
+        var mk=T.match(/^(ค้าง|ปล่อย|HOLD|REL)(.+)$/), kind='';
+        if(mk){ kind=(mk[1]==='ค้าง'||mk[1]==='HOLD')?'h':'r'; T=mk[2]; }
+        var hold=3, mh=!kind&&T.match(/^(.+?)[:：](\d{1,3})$/); if(mh){ T=mh[1]; hold=Math.max(1,Math.min(300,+mh[2])); }
         var parts=T.split('+'), b=[];
         for(var j=0;j<parts.length;j++){ var m=MACRO_MAP[parts[j]]; if(!m) return {err:'ไม่รู้จักคำสั่ง "'+raw+'"'}; m.forEach(function(x){ if(b.indexOf(x)<0) b.push(x); }); }
+        if(kind){ steps.push({b:b,h:0,w:0,k:kind}); continue; }
         steps.push({b:b,h:hold,w:2});
       }
       if(steps.length>60) return {err:'คำสั่งยาวเกินไป (สูงสุด 60 จังหวะ)'};
@@ -4074,7 +4078,11 @@ void main()
     function br2MacroRun(steps,press,key){
       key=key||'p1'; if(br2MacroBusy[key]) return false; br2MacroBusy[key]=true;
       var f=0, held={}, ev=[];
-      steps.forEach(function(s){ if(s.b.length){ ev.push([f,s.b,true]); ev.push([f+s.h,s.b,false]); } f+=s.h+s.w; });
+      steps.forEach(function(s){
+        if(s.k==='h'){ if(s.b.length) ev.push([f,s.b,true]); }
+        else if(s.k==='r'){ if(s.b.length) ev.push([f,s.b,false]); }
+        else if(s.b.length){ ev.push([f,s.b,true]); ev.push([f+s.h,s.b,false]); }
+        f+=s.h+s.w; });
       var idx=0, useFrames=br2FrameAlive(), f0=br2Frame, t0=performance.now(), lastF=br2Frame, lastFT=t0;
       function apply(now){ while(idx<ev.length&&ev[idx][0]<=now){ var e=ev[idx++]; e[1].forEach(function(n){ if(e[2]) held[n]=1; else delete held[n]; try{ press(n,e[2]); }catch(_){ } }); } }
       function done(){
@@ -4121,10 +4129,11 @@ void main()
       if(!ed.__init){ ed.__init=true;
         Array.prototype.forEach.call(ed.querySelectorAll('.slots button'),function(b){ b.addEventListener('click',function(){ showSlot(+b.getAttribute('data-slot')); }); });
         var keys=document.getElementById('macro-keys');
-        ['↑','↓','←','→','↖','↗','↙','↘','□','○','△','✕','+','w5','L1','L2','R1','R2','⌫'].forEach(function(k){ var bt=document.createElement('button'); bt.type='button'; bt.textContent=k;
+        ['↑','↓','←','→','↖','↗','↙','↘','□','○','△','✕','+','w5','ค้าง','ปล่อย','L1','L2','R1','R2','⌫'].forEach(function(k){ var bt=document.createElement('button'); bt.type='button'; bt.textContent=k;
           bt.addEventListener('click',function(){ var v=ta.value;
             if(k==='⌫'){ ta.value=v.replace(/\s*\S+\s*$/,''); }
             else if(k==='+'){ ta.value=v.replace(/\s+$/,'')+'+'; }
+            else if(/[+]$|ค้าง$|ปล่อย$/.test(v)){ ta.value=v+k; }
             else { ta.value=(v===''||/[\s+]$/.test(v))?v+k:v+' '+k; }
             check(); }); keys.appendChild(bt); });
         var check=function(){ var r=br2MacroParse(ta.value); msg.style.color=r.err?'#fca5a5':'#86efac';

@@ -195,7 +195,7 @@
       var steps=[];
       for(var i=0;i<d.q.length&&i<60;i++){ var q=d.q[i]; if(!Array.isArray(q)) return;
         var b=String(q[0]||'').split('+').filter(function(n){ return n&&LS_BTN.indexOf(n)>=0; });
-        steps.push({b:b,h:Math.max(0,Math.min(300,q[1]|0)),w:Math.max(0,Math.min(500,q[2]|0))}); }
+        steps.push({b:b,h:Math.max(0,Math.min(300,q[1]|0)),w:Math.max(0,Math.min(500,q[2]|0)),k:(q[3]==='h'||q[3]==='r')?q[3]:''}); }
       if(typeof window.__br2MacroRun!=='function') return;
       window.__br2MacroRun(steps,function(n,on){ if(on) ng.pressDown({button:n,player:2}); else ng.pressUp({button:n,player:2}); },'p2');
       if((ST.macroLogged=(ST.macroLogged||0)+1)<=3) stLog('P2 ใช้มาโคร M1','muted');
@@ -203,7 +203,7 @@
     ST.onMacro=stOnMacro; // ใช้ทดสอบ
     window.__br2MacroRemote=function(steps){
       if(stRole()!==2) return;
-      var msg={t:'sm',id:(Date.now()%1000000000)+'-'+(++ST.seq),q:steps.map(function(s){ return [s.b.join('+'),s.h,s.w]; })};
+      var msg={t:'sm',id:(Date.now()%1000000000)+'-'+(++ST.seq),q:steps.map(function(s){ return s.k?[s.b.join('+'),s.h,s.w,s.k]:[s.b.join('+'),s.h,s.w]; })};
       var js=JSON.stringify(msg); if(js.length>2000){ stLog('มาโครยาวเกินไป ส่งไม่ได้','err'); return; }
       try{ if(ST.dc&&ST.dc.readyState==='open') ST.dc.send(js); }catch(_){ }
       lsSendRaw(msg);
