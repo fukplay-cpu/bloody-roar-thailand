@@ -172,7 +172,7 @@
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
           try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=1500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
       var dc=pc.createDataChannel('in',{ordered:false,maxRetransmits:0}); ST.dc=dc;
-      dc.onmessage=function(e){ try{ stOnInput(JSON.parse(e.data)); }catch(_){ } };
+      dc.onmessage=function(e){ try{ var d=JSON.parse(e.data); if(d&&d.t==='sm') stOnMacro(d); else stOnInput(d); }catch(_){ } };
       var offer=await pc.createOffer(); await pc.setLocalDescription(offer);
       await stWaitIce(pc,2500);
       stSendSig('offer',{type:pc.localDescription.type,sdp:pc.localDescription.sdp});
@@ -187,6 +187,27 @@
       for(var i=0;i<LS_BTN.length;i++){ var m=1<<i; if((old^bits)&m){
         try{ if(bits&m) ng.pressDown({button:LS_BTN[i],player:2}); else ng.pressUp({button:LS_BTN[i],player:2}); }catch(e){ if(!ST.pressErr){ ST.pressErr=1; stLog('กดปุ่ม P2 ในเกมไม่ได้: '+(e.message||e),'err'); } } } }
     }
+
+    // ----- มาโคร M1 ของ P2: ส่งคำสั่งทั้งชุดให้ P1 เป็นคนกด (จังหวะไม่เพี้ยนตามปิง) -----
+    function stOnMacro(d){
+      if(!ng||!d||!Array.isArray(d.q)) return;
+      if(d.id===ST.lastMacroId) return; ST.lastMacroId=d.id; // มาทั้งช่องตรงและผ่านเซิร์ฟเวอร์ → ใช้ครั้งเดียว
+      var steps=[];
+      for(var i=0;i<d.q.length&&i<60;i++){ var q=d.q[i]; if(!Array.isArray(q)) return;
+        var b=String(q[0]||'').split('+').filter(function(n){ return n&&LS_BTN.indexOf(n)>=0; });
+        steps.push({b:b,h:Math.max(0,Math.min(300,q[1]|0)),w:Math.max(0,Math.min(500,q[2]|0))}); }
+      if(typeof window.__br2MacroRun!=='function') return;
+      window.__br2MacroRun(steps,function(n,on){ if(on) ng.pressDown({button:n,player:2}); else ng.pressUp({button:n,player:2}); },'p2');
+      if((ST.macroLogged=(ST.macroLogged||0)+1)<=3) stLog('P2 ใช้มาโคร M1','muted');
+    }
+    ST.onMacro=stOnMacro; // ใช้ทดสอบ
+    window.__br2MacroRemote=function(steps){
+      if(stRole()!==2) return;
+      var msg={t:'sm',id:(Date.now()%1000000000)+'-'+(++ST.seq),q:steps.map(function(s){ return [s.b.join('+'),s.h,s.w]; })};
+      var js=JSON.stringify(msg); if(js.length>2000){ stLog('มาโครยาวเกินไป ส่งไม่ได้','err'); return; }
+      try{ if(ST.dc&&ST.dc.readyState==='open') ST.dc.send(js); }catch(_){ }
+      lsSendRaw(msg);
+    };
 
     // ----- P2: รับภาพ -----
     function stViewerUi(){
@@ -309,6 +330,7 @@
       if(d.t==='sd'){ stOnSigChunk(d); return true; }
       if(d.t==='sh'){ if(stRole()===1) stHostOffer().catch(function(e){ stLog('สร้างการเชื่อมต่อไม่สำเร็จ: '+(e.message||e),'err'); }); return true; }
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
+      if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='rdy'||d.t==='i'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดล็อกเฟรม"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return true; }
       return false;
     }
