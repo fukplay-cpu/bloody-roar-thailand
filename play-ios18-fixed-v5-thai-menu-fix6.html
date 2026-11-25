@@ -4680,6 +4680,10 @@ void main()
         try{ localStorage.removeItem(BR2_DL_KEY); }catch(_){ }
         if (tryKey >= 2) { alert('รหัสไม่ถูกต้อง · ใช้ "เลือกไฟล์จากเครื่อง" แทนได้'); return; }
       }
+      // ขนาด ZIP อ่านจากเซิร์ฟเวอร์ (เปลี่ยนไฟล์ใน R2 ได้โดยไม่ต้องแก้หน้าเว็บ)
+      var ZIP_SIZE = 0;
+      try { var crm = (probe && probe.headers.get('Content-Range') || '').match(/\/(\d+)$/); if (crm) ZIP_SIZE = Number(crm[1]); } catch(_) { }
+      if (!ZIP_SIZE) { alert('อ่านขนาดไฟล์เกมจากเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง'); return; }
       try { sessionStorage.setItem('br2_v4_last_attempt', new Date().toISOString()); } catch(_) {} br2Mark('server-load-start','เริ่มดึง ZIP จาก Cloudflare R2');
       btn.disabled = true;
       showStatus('Connexion au serveur…');
@@ -4689,11 +4693,11 @@ void main()
         // อ่านท้าย ZIP ทีละช่วง 16 KB เพื่อลดจำนวนคำขอ Worker
         br2Mark('zip-tail-check-start','ตรวจสอบท้าย ZIP');
         var tailParts = [];
-        var tailStart = 319845831 - 65557;
-        for (var off = tailStart; off < 319845831; off += 16384) {
-          var last = Math.min(off + 16383, 319845830);
+        var tailStart = Math.max(0, ZIP_SIZE - 65557);
+        for (var off = tailStart; off < ZIP_SIZE; off += 16384) {
+          var last = Math.min(off + 16383, ZIP_SIZE - 1);
           showStatus('ตรวจสอบท้าย ZIP… ' + Math.round((off-tailStart)/65557*100) + '%');
-          var partResp = await br2Range(off, last, 319845831);
+          var partResp = await br2Range(off, last, ZIP_SIZE);
           tailParts.push(new Uint8Array(await partResp.arrayBuffer()));
         }
         var tailLen = tailParts.reduce(function(n,a){return n+a.length;},0);
@@ -4712,7 +4716,7 @@ void main()
           throw new Error('ZIP64 ยังไม่รองรับในตัวทดสอบนี้');
         }
         br2Mark('zip-directory-read','กำลังอ่านรายการไฟล์ใน ZIP'); showStatus('อ่านรายการไฟล์ใน ZIP…');
-        var cdResp = await br2Range(cdOffset, cdOffset + cdSize - 1, 319845831);
+        var cdResp = await br2Range(cdOffset, cdOffset + cdSize - 1, ZIP_SIZE);
         var cd = new Uint8Array(await cdResp.arrayBuffer());
         var dv = new DataView(cd.buffer, cd.byteOffset, cd.byteLength);
         var entries = [], pos = 0;
@@ -4740,7 +4744,7 @@ void main()
         for (var j = 0; j < entries.length; j++) {
           var e = entries[j];
           showStatus('กำลังอ่าน ' + e.name + ' (' + (j+1) + '/' + entries.length + ')…');
-          var lhResp = await br2Range(e.localOffset, e.localOffset + 29, 319845831);
+          var lhResp = await br2Range(e.localOffset, e.localOffset + 29, ZIP_SIZE);
           var lh = new Uint8Array(await lhResp.arrayBuffer());
           var lv = new DataView(lh.buffer, lh.byteOffset, lh.byteLength);
           if (br2U32(lv, 0) !== 0x04034b50) throw new Error('Local ZIP header ไม่ถูกต้อง: ' + e.name);
@@ -4772,7 +4776,7 @@ void main()
             pull: async function(controller) {
               if (nextOffset > dataEnd) { controller.close(); return; }
               var chunkEnd = Math.min(nextOffset + CHUNK_BYTES - 1, dataEnd);
-              var chunkResp = await br2Range(nextOffset, chunkEnd, 319845831);
+              var chunkResp = await br2Range(nextOffset, chunkEnd, ZIP_SIZE);
               var chunkBuffer = await chunkResp.arrayBuffer();
               var expectedChunk = chunkEnd - nextOffset + 1;
               if (chunkBuffer.byteLength !== expectedChunk) {
