@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>อัปโหลดไฟล์เกม (เจ้าของเว็บ)</title>
+<style>
+  body{margin:0;min-height:100vh;background:#0b0b0d;color:#eee;font:15px/1.6 system-ui,sans-serif;display:flex;justify-content:center}
+  main{width:min(560px,100%);padding:24px 18px}
+  h1{font-size:20px;margin:0 0 4px}
+  p.note{color:#aaa;font-size:13px;margin:0 0 18px}
+  label{display:block;margin:14px 0 6px;color:#ccc}
+  input[type=password],input[type=file]{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #444;background:#151518;color:#fff;font:inherit}
+  button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:10px;background:#c9a24b;color:#111;font:600 16px system-ui;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .bar{height:12px;margin-top:16px;background:#222;border-radius:6px;overflow:hidden}
+  .bar div{height:100%;width:0;background:#22c55e;transition:width .2s}
+  #msg{margin-top:12px;white-space:pre-wrap;font-size:14px}
+  .err{color:#fca5a5}.ok{color:#86efac}
+</style>
+</head>
+<body>
+<main>
+  <h1>อัปโหลดไฟล์เกมขึ้นที่เก็บส่วนตัว</h1>
+  <p class="note">สำหรับเจ้าของเว็บเท่านั้น · ไฟล์ที่อัปโหลดจะแทนที่ไฟล์เดิมในที่เก็บ · ต้องเป็น ZIP ที่มีไฟล์คู่ .cue และ .bin</p>
+  <label for="tok">รหัสอัปโหลด (UPLOAD_TOKEN)</label>
+  <input id="tok" type="password" autocomplete="off">
+  <label for="file">ไฟล์ ZIP</label>
+  <input id="file" type="file" accept=".zip,application/zip">
+  <button id="go" type="button">อัปโหลด</button>
+  <div class="bar"><div id="bar"></div></div>
+  <div id="msg"></div>
+</main>
+<script>
+(function(){
+  var API='https://br2-upload-gateway.fukthefuk400.workers.dev/';
+  var PART=50*1024*1024; // 50 MB ต่อชิ้น (ทุกชิ้นต้องขนาดเท่ากัน ยกเว้นชิ้นสุดท้าย)
+  var msg=document.getElementById('msg'), bar=document.getElementById('bar'), go=document.getElementById('go');
+  function say(t,c){ msg.textContent=t; msg.className=c||''; }
+  async function call(action,method,token,query,body,json){
+    var url=API+'?action='+action+(query||'');
+    var h={'Authorization':'Bearer '+token}; if(json) h['Content-Type']='application/json';
+    var r=await fetch(url,{method:method,headers:h,body:body});
+    var t=await r.text();
+    if(r.status===401) throw new Error('รหัสอัปโหลดไม่ถูกต้อง');
+    if(!r.ok) throw new Error('เซิร์ฟเวอร์ตอบ '+r.status+': '+t.slice(0,200));
+    try{ return JSON.parse(t); }catch(_){ return t; }
+  }
+  go.addEventListener('click',async function(){
+    var token=document.getElementById('tok').value.trim(), f=document.getElementById('file').files[0];
+    if(!token){ say('ใส่รหัสอัปโหลดก่อน','err'); return; }
+    if(!f){ say('เลือกไฟล์ ZIP ก่อน','err'); return; }
+    if(!/\.zip$/i.test(f.name)){ say('ต้องเป็นไฟล์ .zip','err'); return; }
+    go.disabled=true; bar.style.width='0%';
+    var up=null;
+    try{
+      say('กำลังเริ่ม…');
+      up=await call('create','POST',token);
+      var total=Math.ceil(f.size/PART), parts=[];
+      for(var i=0;i<total;i++){
+        var blob=f.slice(i*PART,Math.min(f.size,(i+1)*PART)), done=false, err=null;
+        for(var a=0;a<3&&!done;a++){
+          try{ var p=await call('part','PUT',token,'&uploadId='+encodeURIComponent(up.uploadId)+'&partNumber='+(i+1),blob); parts.push({partNumber:p.partNumber,etag:p.etag}); done=true; }
+          catch(e){ err=e; if(/รหัส/.test(e.message)) break; await new Promise(function(r){ setTimeout(r,1500*(a+1)); }); }
+        }
+        if(!done) throw err;
+        bar.style.width=Math.round((i+1)/total*100)+'%';
+        say('อัปโหลดแล้ว '+(i+1)+'/'+total+' ชิ้น ('+Math.round((i+1)/total*100)+'%)');
+      }
+      say('กำลังรวมไฟล์…');
+      var res=await call('complete','POST',token,'&uploadId='+encodeURIComponent(up.uploadId),JSON.stringify({parts:parts}),true);
+      say('สำเร็จ · ขนาด '+(res.size/1048576).toFixed(1)+' MB\nกลับไปหน้าเกม กด 🗑 ล้างเกมเก่า แล้วกด 🔒 ดาวน์โหลดจากเซิร์ฟเวอร์','ok');
+    }catch(e){
+      say('ไม่สำเร็จ: '+e.message,'err');
+      if(up&&up.uploadId){ try{ await call('abort','DELETE',token,'&uploadId='+encodeURIComponent(up.uploadId)); }catch(_){ } }
+    }finally{ go.disabled=false; }
+  });
+})();
+</script>
+</body>
+</html>
