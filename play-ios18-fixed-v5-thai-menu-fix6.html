@@ -4030,6 +4030,21 @@ void main()
       }
       var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse&&!window.__br2PadHidden) pad.classList.add('show'); applyPadLayout();
     }
+    // ===== ตัวนับเฟรมของเกม: ตัวเกมอ่านจอยผ่าน navigator.getGamepads() ครั้งเดียวต่อ 1 เฟรม (บนเธรดหลัก) =====
+    var br2Frame=0, br2FrameT=0, br2FrameHooks=[], br2FramePending=false;
+    function br2Pads(){ try{ if(window.__br2RawPads) return window.__br2RawPads()||[]; return navigator.getGamepads?(navigator.getGamepads()||[]):[]; }catch(_){ return []; } }
+    (function(){ try{
+      if(!navigator.getGamepads||window.__br2RawPads) return;
+      var raw=navigator.getGamepads.bind(navigator); window.__br2RawPads=raw;
+      Object.defineProperty(navigator,'getGamepads',{configurable:true,writable:true,value:function(){
+        br2Frame++; br2FrameT=performance.now();
+        if(br2FrameHooks.length&&!br2FramePending){ br2FramePending=true;
+          // กดปุ่มหลังเฟรมนี้จบ (ไม่แทรกกลางรอบของตัวเกม) → เฟรมถัดไปเห็นปุ่มแน่นอน
+          Promise.resolve().then(function(){ br2FramePending=false; br2FrameHooks.slice().forEach(function(h){ try{ h(br2Frame); }catch(_){ } }); }); }
+        return raw(); }});
+    }catch(_){ } })();
+    function br2FrameAlive(){ return br2FrameT>0&&performance.now()-br2FrameT<300; }
+    window.__br2FrameInfo=function(){ return {frame:br2Frame,alive:br2FrameAlive()}; };
     // ===== ปุ่มมาโคร M1: กดครั้งเดียว เกมจะกดปุ่มตามลำดับที่ตั้งไว้ =====
     var MACRO_KEYS={1:'br2_macro_m1',2:'br2_macro_m2'}, MACRO_DEFS={1:'↓ ↓ ↓ ○',2:'□ □ △'}, MACRO_FRAME=20; // 1 เฟรม = 1/50 วินาที (เกม PAL)
     var MACRO_MAP={'↑':['up'],'↓':['down'],'←':['left'],'→':['right'],'▲':['up'],'▼':['down'],'◀':['left'],'▶':['right'],
@@ -4055,18 +4070,27 @@ void main()
     }
     var br2MacroBusy={};
     // รันมาโคร: press(name,on) คือฟังก์ชันกดปุ่ม · key แยกคิวของแต่ละผู้เล่น (กดซ้ำระหว่างทำงานจะไม่ซ้อน)
+    // นับตามเฟรมจริงของเกม (ตัวนับ br2Frame) → เครื่องกระตุกก็ยังได้จังหวะเท่าเดิม · ถ้าเกมไม่เดิน ใช้นาฬิกาแทน
     function br2MacroRun(steps,press,key){
       key=key||'p1'; if(br2MacroBusy[key]) return false; br2MacroBusy[key]=true;
-      var t0=performance.now(), t=0, held={}, ev=[];
-      steps.forEach(function(s){ if(s.b.length){ ev.push([t,s.b,true]); ev.push([t+s.h*MACRO_FRAME,s.b,false]); } t+=s.h*MACRO_FRAME+s.w*MACRO_FRAME; });
-      var idx=0;
-      (function tick(){
-        var now=performance.now()-t0;
-        while(idx<ev.length&&ev[idx][0]<=now+1){ var e=ev[idx++]; e[1].forEach(function(n){ if(e[2]) held[n]=1; else delete held[n]; try{ press(n,e[2]); }catch(_){ } }); }
-        if(idx<ev.length){ setTimeout(tick,Math.max(0,ev[idx][0]-(performance.now()-t0))); return; }
-        Object.keys(held).forEach(function(n){ try{ press(n,false); }catch(_){ } }); br2MacroBusy[key]=false;
+      var f=0, held={}, ev=[];
+      steps.forEach(function(s){ if(s.b.length){ ev.push([f,s.b,true]); ev.push([f+s.h,s.b,false]); } f+=s.h+s.w; });
+      var idx=0, useFrames=br2FrameAlive(), f0=br2Frame, t0=performance.now(), lastF=br2Frame, lastFT=t0;
+      function apply(now){ while(idx<ev.length&&ev[idx][0]<=now){ var e=ev[idx++]; e[1].forEach(function(n){ if(e[2]) held[n]=1; else delete held[n]; try{ press(n,e[2]); }catch(_){ } }); } }
+      function done(){
+        Object.keys(held).forEach(function(n){ try{ press(n,false); }catch(_){ } }); held={}; br2MacroBusy[key]=false;
+        var i=br2FrameHooks.indexOf(onFrame); if(i>=0) br2FrameHooks.splice(i,1);
         if(key==='p1') ['btn-m1','btn-m2'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('on'); });
-      })();
+      }
+      function onFrame(fr){ if(fr!==lastF){ lastF=fr; lastFT=performance.now(); } apply(fr-f0); if(idx>=ev.length) done(); }
+      if(useFrames){
+        br2FrameHooks.push(onFrame); apply(0); if(idx>=ev.length){ done(); return true; }
+        (function guard(){ if(!br2MacroBusy[key]) return; // เกมหยุดเดินนานเกิน 10 วินาที (ปิดเกม/ค้าง) → ปล่อยปุ่มทั้งหมด
+          if(performance.now()-lastFT>10000){ done(); return; } setTimeout(guard,1000); })();
+      } else {
+        (function tick(){ var now=(performance.now()-t0)/MACRO_FRAME; apply(now+0.05);
+          if(idx<ev.length){ setTimeout(tick,Math.max(0,(ev[idx][0]-(performance.now()-t0)/MACRO_FRAME)*MACRO_FRAME)); return; } done(); })();
+      }
       return true;
     }
     window.__br2MacroRun=br2MacroRun;
@@ -4170,7 +4194,7 @@ void main()
     // กดปุ่มบนจอยครั้งแรก → ซ่อนปุ่มบนจอ (จะได้ไม่บังภาพเกม)
     // แตะจอ (นอกแถบเมนู) หรือถอดจอย → ปุ่มบนจอกลับมา
     (function(){
-      function anyPad(){ try{ var g=navigator.getGamepads?navigator.getGamepads():[]; for(var i=0;i<g.length;i++) if(g[i]&&g[i].connected) return true; }catch(_){ } return false; }
+      function anyPad(){ try{ var g=br2Pads(); for(var i=0;i<g.length;i++) if(g[i]&&g[i].connected) return true; }catch(_){ } return false; }
       function hidePad(){ if(window.__br2PadHidden) return; window.__br2PadHidden=true; try{ pad.classList.remove('show'); setTimeout(fit,30); }catch(_){ } try{ log('เจอจอย → ซ่อนปุ่มบนจอ (แตะจอเพื่อเอากลับมา)','ok'); }catch(_){ } }
       function showPad(){ if(!window.__br2PadHidden) return; window.__br2PadHidden=false;
         var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
@@ -4178,7 +4202,7 @@ void main()
       window.addEventListener('gamepadconnected',hidePad);
       window.addEventListener('gamepaddisconnected',function(){ setTimeout(function(){ if(!anyPad()) showPad(); },100); });
       // Safari บางรุ่นไม่ส่ง gamepadconnected จนกว่าจะกดปุ่ม → เช็กเองเป็นระยะ
-      setInterval(function(){ if(!window.__br2PadHidden&&anyPad()){ try{ var g=navigator.getGamepads(); for(var i=0;i<g.length;i++){ var p=g[i]; if(p&&p.connected&&p.buttons.some(function(b){ return b.pressed; })){ hidePad(); break; } } }catch(_){ } } },500);
+      setInterval(function(){ if(!window.__br2PadHidden&&anyPad()){ try{ var g=br2Pads(); for(var i=0;i<g.length;i++){ var p=g[i]; if(p&&p.connected&&p.buttons.some(function(b){ return b.pressed; })){ hidePad(); break; } } }catch(_){ } } },500);
       window.addEventListener('touchstart',function(e){ var t=e.target; if(window.__br2PadHidden&&!(t&&t.closest&&t.closest('#bar'))) showPad(); },{passive:true});
     })();
     function closePadEditor(){padEditActive=false;pad.classList.remove('edit-mode');document.getElementById('pad-editor').hidden=true;releaseAll();}

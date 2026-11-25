@@ -276,7 +276,7 @@
       function poll(){
         requestAnimationFrame(poll);
         if(!window.__br2Viewer||!navigator.getGamepads) return;
-        var pads=navigator.getGamepads(), g=null; for(var i=0;i<pads.length;i++){ if(pads[i]&&pads[i].connected){ g=pads[i]; break; } }
+        var pads=(window.__br2RawPads?window.__br2RawPads():navigator.getGamepads())||[], g=null; for(var i=0;i<pads.length;i++){ if(pads[i]&&pads[i].connected){ g=pads[i]; break; } }
         if(!g) return;
         if(!gpSeen){ gpSeen=true; stLog('เจอจอย: '+g.id,'ok'); }
         var now={};
