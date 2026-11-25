@@ -4689,7 +4689,7 @@ void main()
         +'<div class="row"><div class="dpad layout-item" id="dpad" data-layout-id="dpad"><span class="hub"></span><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span></div>'
         +'<div class="face"><button class="tri" data-btn="x" data-layout-id="triangle">△</button><button class="sq" data-btn="y" data-layout-id="square">□</button><button class="ci" data-btn="a" data-layout-id="circle">○</button><button class="cr" data-btn="b" data-layout-id="cross">✕</button></div></div>'
         +'<button class="macro" id="btn-m1" type="button" data-layout-id="m1" title="มาโคร M1 (คีย์บอร์ด: M)">M1</button>'
-        +'<button class="macro m2" id="btn-m2" type="button" data-layout-id="m2" title="มาโคร M2 (คีย์บอร์ด: N)">M2</button>'
+        +'<button class="macro m2" id="btn-m2" type="button" data-layout-id="m2" title="มาโคร M2 (คีย์บอร์ด: R)">M2</button>'
         +'<div class="se"><button data-btn="select" data-layout-id="select">Select</button><button data-btn="start" data-layout-id="start">Start</button></div>'
         +'<div class="ds"><button id="ds-toggle" type="button">DualShock</button></div>'
         +'<div class="stick left" id="stickL"><span class="knob"></span></div><div class="stick right" id="stickR"><span class="knob"></span></div>';
@@ -4798,8 +4798,10 @@ void main()
       });
     }
     document.addEventListener('keydown',function(e){
-      if((e.code!=='KeyM'&&e.code!=='KeyN')||e.repeat) return; var tg=e.target&&e.target.tagName; if(tg==='TEXTAREA'||tg==='INPUT') return;
-      br2MacroFire(e.code==='KeyN'?2:1);
+      // รับเฉพาะการกดคีย์บอร์ดจริง: ปุ่มของ P2 ถูกจำลองเป็นคีย์บอร์ด (ขวา = N) ห้ามไปสั่งมาโคร
+      // M2 ใช้ R เพราะ N เป็นปุ่มขวาของ P2 ในตัวเกม
+      if(!e.isTrusted||(e.code!=='KeyM'&&e.code!=='KeyR')||e.repeat) return; var tg=e.target&&e.target.tagName; if(tg==='TEXTAREA'||tg==='INPUT') return;
+      br2MacroFire(e.code==='KeyR'?2:1);
     },true);
     var macroSlot=1;
     function br2MacroOpen(slot){
