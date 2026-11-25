@@ -78,6 +78,21 @@
   #pad .se button{position:absolute;min-height:34px;padding:.4rem .8rem;transform:translate(-50%,-50%)}
   #pad [data-btn="select"]{left:42%;top:88%} #pad [data-btn="start"]{left:52%;top:88%}
   #pad .stick{z-index:1}
+  #pad .macro{position:absolute;left:72%;top:86%;width:calc(var(--k)*.82);height:calc(var(--k)*.82);padding:0;border-radius:50%;transform:translate(-50%,-50%);font-weight:700;letter-spacing:0;color:#ffd27a;border-color:rgba(201,162,75,.7)}
+  #pad .macro.on{color:#0a0a0a}
+  #macro-editor{position:fixed;z-index:30;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);width:min(420px,calc(100vw - 20px));max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);box-sizing:border-box;overflow:auto;padding:12px;background:rgba(12,12,14,.97);border:1px solid #c9a24b;border-radius:12px;color:#f4f4f4;font:13px system-ui,sans-serif;box-shadow:0 8px 30px #000a}
+  #macro-editor[hidden]{display:none}
+  #macro-editor header,#macro-editor footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  #macro-editor header{font-size:15px;margin-bottom:8px}
+  #macro-editor textarea{display:block;width:100%;box-sizing:border-box;min-height:64px;margin:6px 0;padding:8px;background:#000;color:#ffd27a;border:1px solid #555;border-radius:8px;font:16px ui-monospace,monospace}
+  #macro-editor .keys{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 8px}
+  #macro-editor .keys button{min-width:38px;padding:7px 6px}
+  #macro-editor button{background:#242428;color:#fff;border:1px solid #777;border-radius:8px;padding:8px 10px;font:inherit}
+  #macro-editor #macro-save{background:#147d39;border-color:#1cbd58}
+  #macro-editor p{font-size:11px;line-height:1.5;color:#c4c4c4;margin:6px 0}
+  #macro-editor code{color:#ffd27a}
+  #macro-msg{min-height:1.2em;font-size:12px}
+  @media (orientation:landscape) and (max-height:500px){ #macro-editor textarea{min-height:40px} #macro-editor .keys button{min-width:32px;padding:5px 4px} #macro-editor p{font-size:10px;margin:3px 0} }
   #pad .stick.left{left:calc(var(--k)*3.5)} #pad .stick.right{right:calc(var(--k)*3.5)}
   #pad.edit-mode{pointer-events:auto;z-index:24;background:rgba(0,0,0,.08);touch-action:none}
   #pad.edit-mode button,#pad.edit-mode .dpad{outline:1px dashed rgba(75,155,255,.9);outline-offset:3px}
@@ -131,6 +146,7 @@
       <button data-act="resetgame" title="รีเฟรชตัวเกมโดยไม่โหลดหน้าเว็บใหม่ และคงการเชื่อมต่อออนไลน์ไว้">รีเฟรชเกม</button>
       <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
         <button data-act="dot1" id="btn-dot1" title="เปิด/ปิดฟิลเตอร์จุดภาพ (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ</button>
+        <button data-act="macro" title="ตั้งคำสั่งให้ปุ่ม M1">ตั้งค่ามาโคร M1</button>
         <button data-act="aspect" id="btn-aspect" title="สลับภาพเกมระหว่าง 4:3 (สัดส่วนเดิม) กับยืดเต็มจอ (ใช้ได้ตอนจอแนวนอน)">ภาพ: 4:3</button>
         <button data-act="dot2" id="btn-dot2" title="ฟิลเตอร์จุดภาพ 2 เท่า — จุดใหญ่ขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ 2×</button>
         <button data-act="importstate">นำเข้าสถานะเกม</button>
@@ -147,6 +163,14 @@
       <label>ความโปร่งใส <output id="pad-opacity-value">100%</output><input id="pad-opacity" type="range" min="20" max="100" value="100"></label>
       <p>ลากหัวข้อหน้าต่างเพื่อย้ายแผงนี้ • ลากปุ่มบนหน้าจอเพื่อย้ายตำแหน่ง • D-Pad ปรับเป็นกลุ่มเดียว</p>
       <footer><button type="button" id="pad-reset">คืนค่าตำแหน่ง</button><button type="button" id="pad-save">บันทึกการตั้งค่า</button></footer>
+    </section>
+    <section id="macro-editor" hidden aria-label="ตั้งค่าปุ่มมาโคร M1">
+      <header><strong>ตั้งค่าปุ่ม M1 (มาโคร)</strong><button type="button" id="macro-close" aria-label="ปิด">✕</button></header>
+      <textarea id="macro-text" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="เช่น ↓ ↓ ↓ ○"></textarea>
+      <div class="keys" id="macro-keys"></div>
+      <div id="macro-msg"></div>
+      <p>• เว้นวรรคคั่นแต่ละจังหวะ เช่น <code>↓ ↓ ↓ ○</code><br>• กดพร้อมกันใช้ <code>+</code> เช่น <code>↓+□</code><br>• กดค้างกี่เฟรมใช้ <code>:</code> เช่น <code>□:10</code> (ปกติ 3 เฟรม)<br>• หยุดรอใช้ <code>w</code> ตามด้วยจำนวนเฟรม เช่น <code>w10</code> (1 เฟรม ≈ 1/50 วินาที)<br>• ปุ่ม: ↑ ↓ ← → ↖ ↗ ↙ ↘ □ ○ △ ✕ L1 L2 R1 R2 START SELECT<br>• ทิศซ้าย/ขวาเป็นทิศบนจอ ถ้าตัวละครหันอีกด้าน ท่าที่กด "หน้า" จะกลับทิศ</p>
+      <footer><button type="button" id="macro-test">▶ ทดสอบ</button><button type="button" id="macro-default">ค่าเริ่มต้น</button><button type="button" id="macro-save">บันทึก</button></footer>
     </section>
     <div id="loader">
       <button id="loader-close" title="Fermer">✕</button>
@@ -4071,7 +4095,7 @@ try {
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
           try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=1500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
       var dc=pc.createDataChannel('in',{ordered:false,maxRetransmits:0}); ST.dc=dc;
-      dc.onmessage=function(e){ try{ stOnInput(JSON.parse(e.data)); }catch(_){ } };
+      dc.onmessage=function(e){ try{ var d=JSON.parse(e.data); if(d&&d.t==='sm') stOnMacro(d); else stOnInput(d); }catch(_){ } };
       var offer=await pc.createOffer(); await pc.setLocalDescription(offer);
       await stWaitIce(pc,2500);
       stSendSig('offer',{type:pc.localDescription.type,sdp:pc.localDescription.sdp});
@@ -4086,6 +4110,27 @@ try {
       for(var i=0;i<LS_BTN.length;i++){ var m=1<<i; if((old^bits)&m){
         try{ if(bits&m) ng.pressDown({button:LS_BTN[i],player:2}); else ng.pressUp({button:LS_BTN[i],player:2}); }catch(e){ if(!ST.pressErr){ ST.pressErr=1; stLog('กดปุ่ม P2 ในเกมไม่ได้: '+(e.message||e),'err'); } } } }
     }
+
+    // ----- มาโคร M1 ของ P2: ส่งคำสั่งทั้งชุดให้ P1 เป็นคนกด (จังหวะไม่เพี้ยนตามปิง) -----
+    function stOnMacro(d){
+      if(!ng||!d||!Array.isArray(d.q)) return;
+      if(d.id===ST.lastMacroId) return; ST.lastMacroId=d.id; // มาทั้งช่องตรงและผ่านเซิร์ฟเวอร์ → ใช้ครั้งเดียว
+      var steps=[];
+      for(var i=0;i<d.q.length&&i<60;i++){ var q=d.q[i]; if(!Array.isArray(q)) return;
+        var b=String(q[0]||'').split('+').filter(function(n){ return n&&LS_BTN.indexOf(n)>=0; });
+        steps.push({b:b,h:Math.max(0,Math.min(300,q[1]|0)),w:Math.max(0,Math.min(500,q[2]|0))}); }
+      if(typeof window.__br2MacroRun!=='function') return;
+      window.__br2MacroRun(steps,function(n,on){ if(on) ng.pressDown({button:n,player:2}); else ng.pressUp({button:n,player:2}); },'p2');
+      if((ST.macroLogged=(ST.macroLogged||0)+1)<=3) stLog('P2 ใช้มาโคร M1','muted');
+    }
+    ST.onMacro=stOnMacro; // ใช้ทดสอบ
+    window.__br2MacroRemote=function(steps){
+      if(stRole()!==2) return;
+      var msg={t:'sm',id:(Date.now()%1000000000)+'-'+(++ST.seq),q:steps.map(function(s){ return [s.b.join('+'),s.h,s.w]; })};
+      var js=JSON.stringify(msg); if(js.length>2000){ stLog('มาโครยาวเกินไป ส่งไม่ได้','err'); return; }
+      try{ if(ST.dc&&ST.dc.readyState==='open') ST.dc.send(js); }catch(_){ }
+      lsSendRaw(msg);
+    };
 
     // ----- P2: รับภาพ -----
     function stViewerUi(){
@@ -4208,6 +4253,7 @@ try {
       if(d.t==='sd'){ stOnSigChunk(d); return true; }
       if(d.t==='sh'){ if(stRole()===1) stHostOffer().catch(function(e){ stLog('สร้างการเชื่อมต่อไม่สำเร็จ: '+(e.message||e),'err'); }); return true; }
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
+      if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='rdy'||d.t==='i'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดล็อกเฟรม"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return true; }
       return false;
     }
@@ -4637,6 +4683,7 @@ void main()
       pad.innerHTML='<div class="sh"><div class="side"><button data-btn="l2" data-layout-id="l2">L2</button><button data-btn="l" data-layout-id="l1">L1</button></div><div class="side"><button data-btn="r" data-layout-id="r1">R1</button><button data-btn="r2" data-layout-id="r2">R2</button></div></div>'
         +'<div class="row"><div class="dpad layout-item" id="dpad" data-layout-id="dpad"><span class="hub"></span><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span></div>'
         +'<div class="face"><button class="tri" data-btn="x" data-layout-id="triangle">△</button><button class="sq" data-btn="y" data-layout-id="square">□</button><button class="ci" data-btn="a" data-layout-id="circle">○</button><button class="cr" data-btn="b" data-layout-id="cross">✕</button></div></div>'
+        +'<button class="macro" id="btn-m1" type="button" data-layout-id="m1" title="มาโคร M1 (คีย์บอร์ด: M)">M1</button>'
         +'<div class="se"><button data-btn="select" data-layout-id="select">Select</button><button data-btn="start" data-layout-id="start">Start</button></div>'
         +'<div class="ds"><button id="ds-toggle" type="button">DualShock</button></div>'
         +'<div class="stick left" id="stickL"><span class="knob"></span></div><div class="stick right" id="stickR"><span class="knob"></span></div>';
@@ -4652,6 +4699,7 @@ void main()
         var rel=function(){ el.classList.remove('on'); delete held[name]; try{ if(ng||window.__br2Viewer) br2Input(name,false); }catch(_){ } };
         el.addEventListener('pointerup',rel); el.addEventListener('pointercancel',rel); el.addEventListener('lostpointercapture',rel);
       });
+      try{ br2MacroBindBtn(); }catch(_){ }
       stickCtl.l=makeStick(document.getElementById('stickL'),'l'); stickCtl.r=makeStick(document.getElementById('stickR'),'r');
       // Bascule DualShock : affiche/masque les sticks analogiques (ils prennent de la place en paysage).
       var dsBtn=document.getElementById('ds-toggle');
@@ -4664,9 +4712,90 @@ void main()
       }
       var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse&&!window.__br2PadHidden) pad.classList.add('show'); applyPadLayout();
     }
+    // ===== ปุ่มมาโคร M1: กดครั้งเดียว เกมจะกดปุ่มตามลำดับที่ตั้งไว้ =====
+    var MACRO_KEY='br2_macro_m1', MACRO_DEF='↓ ↓ ↓ ○', MACRO_FRAME=20; // 1 เฟรม = 1/50 วินาที (เกม PAL)
+    var MACRO_MAP={'↑':['up'],'↓':['down'],'←':['left'],'→':['right'],'▲':['up'],'▼':['down'],'◀':['left'],'▶':['right'],
+      '↖':['up','left'],'↗':['up','right'],'↙':['down','left'],'↘':['down','right'],
+      'U':['up'],'D':['down'],'L':['left'],'R':['right'],'UL':['up','left'],'UR':['up','right'],'DL':['down','left'],'DR':['down','right'],
+      '□':['y'],'○':['a'],'△':['x'],'✕':['b'],'×':['b'],'X':['b'],'O':['a'],
+      'L1':['l'],'L2':['l2'],'R1':['r'],'R2':['r2'],'START':['start'],'SELECT':['select']};
+    function br2MacroText(){ try{ var t=localStorage.getItem(MACRO_KEY); if(t!==null) return t; }catch(_){ } return MACRO_DEF; }
+    function br2MacroParse(txt){
+      var toks=String(txt||'').replace(/[,，]/g,' ').trim().split(/\s+/).filter(Boolean), steps=[];
+      if(!toks.length) return {err:'ยังไม่ได้พิมพ์คำสั่ง'};
+      for(var i=0;i<toks.length;i++){
+        var raw=toks[i], T=raw.toUpperCase();
+        var mw=T.match(/^(?:W|รอ)(\d{1,3})$/);
+        if(mw){ var n=Math.min(500,+mw[1]); if(steps.length) steps[steps.length-1].w+=n; else steps.push({b:[],h:0,w:n}); continue; }
+        var hold=3, mh=T.match(/^(.+?)[:：](\d{1,3})$/); if(mh){ T=mh[1]; hold=Math.max(1,Math.min(300,+mh[2])); }
+        var parts=T.split('+'), b=[];
+        for(var j=0;j<parts.length;j++){ var m=MACRO_MAP[parts[j]]; if(!m) return {err:'ไม่รู้จักคำสั่ง "'+raw+'"'}; m.forEach(function(x){ if(b.indexOf(x)<0) b.push(x); }); }
+        steps.push({b:b,h:hold,w:2});
+      }
+      if(steps.length>60) return {err:'คำสั่งยาวเกินไป (สูงสุด 60 จังหวะ)'};
+      return {steps:steps};
+    }
+    var br2MacroBusy={};
+    // รันมาโคร: press(name,on) คือฟังก์ชันกดปุ่ม · key แยกคิวของแต่ละผู้เล่น (กดซ้ำระหว่างทำงานจะไม่ซ้อน)
+    function br2MacroRun(steps,press,key){
+      key=key||'p1'; if(br2MacroBusy[key]) return false; br2MacroBusy[key]=true;
+      var t0=performance.now(), t=0, held={}, ev=[];
+      steps.forEach(function(s){ if(s.b.length){ ev.push([t,s.b,true]); ev.push([t+s.h*MACRO_FRAME,s.b,false]); } t+=s.h*MACRO_FRAME+s.w*MACRO_FRAME; });
+      var idx=0;
+      (function tick(){
+        var now=performance.now()-t0;
+        while(idx<ev.length&&ev[idx][0]<=now+1){ var e=ev[idx++]; e[1].forEach(function(n){ if(e[2]) held[n]=1; else delete held[n]; try{ press(n,e[2]); }catch(_){ } }); }
+        if(idx<ev.length){ setTimeout(tick,Math.max(0,ev[idx][0]-(performance.now()-t0))); return; }
+        Object.keys(held).forEach(function(n){ try{ press(n,false); }catch(_){ } }); br2MacroBusy[key]=false;
+        var b=document.getElementById('btn-m1'); if(b&&key==='p1') b.classList.remove('on');
+      })();
+      return true;
+    }
+    window.__br2MacroRun=br2MacroRun;
+    function br2MacroFire(){
+      var r=br2MacroParse(br2MacroText()); if(r.err){ try{ log('มาโคร M1: '+r.err,'err'); }catch(_){ } return; }
+      if(window.__br2Viewer&&typeof window.__br2MacroRemote==='function'){ window.__br2MacroRemote(r.steps); return; } // P2: ให้เครื่อง P1 กดแทน จังหวะจะไม่เพี้ยนตามปิง
+      if(!ng) return;
+      var b=document.getElementById('btn-m1');
+      if(br2MacroRun(r.steps,function(n,on){ br2Input(n,on); },'p1')&&b) b.classList.add('on');
+    }
+    function br2MacroBindBtn(){
+      var b=document.getElementById('btn-m1'); if(!b||b.__bound) return; b.__bound=true;
+      b.addEventListener('pointerdown',function(e){ e.preventDefault(); if(padEditActive) return; br2MacroFire(); if(window.__br2Viewer){ b.classList.add('on'); setTimeout(function(){ b.classList.remove('on'); },150); } });
+      ['touchstart','touchend'].forEach(function(t){ b.addEventListener(t,function(e){ if(e.cancelable&&!padEditActive) e.preventDefault(); },{passive:false}); });
+    }
+    document.addEventListener('keydown',function(e){
+      if(e.code!=='KeyM'||e.repeat) return; var tg=e.target&&e.target.tagName; if(tg==='TEXTAREA'||tg==='INPUT') return;
+      br2MacroFire();
+    },true);
+    function br2MacroOpen(){
+      var ed=document.getElementById('macro-editor'), ta=document.getElementById('macro-text'), msg=document.getElementById('macro-msg');
+      if(!ed.__init){ ed.__init=true;
+        var keys=document.getElementById('macro-keys');
+        ['↑','↓','←','→','↖','↗','↙','↘','□','○','△','✕','+','w5','L1','L2','R1','R2','⌫'].forEach(function(k){ var bt=document.createElement('button'); bt.type='button'; bt.textContent=k;
+          bt.addEventListener('click',function(){ var v=ta.value;
+            if(k==='⌫'){ ta.value=v.replace(/\s*\S+\s*$/,''); }
+            else if(k==='+'){ ta.value=v.replace(/\s+$/,'')+'+'; }
+            else { ta.value=(v===''||/[\s+]$/.test(v))?v+k:v+' '+k; }
+            check(); }); keys.appendChild(bt); });
+        var check=function(){ var r=br2MacroParse(ta.value); msg.style.color=r.err?'#fca5a5':'#86efac';
+          msg.textContent=r.err?r.err:('ถูกต้อง · '+r.steps.length+' จังหวะ · ยาวประมาณ '+(r.steps.reduce(function(a,s){return a+s.h+s.w;},0)*MACRO_FRAME/1000).toFixed(2)+' วินาที'); return r; };
+        ed.__check=check;
+        ta.addEventListener('input',check);
+        document.getElementById('macro-close').addEventListener('click',function(){ ed.hidden=true; });
+        document.getElementById('macro-default').addEventListener('click',function(){ ta.value=MACRO_DEF; check(); });
+        document.getElementById('macro-save').addEventListener('click',function(){ var r=check(); if(r.err) return; try{ localStorage.setItem(MACRO_KEY,ta.value.trim()); }catch(_){ } ed.hidden=true; try{ log('บันทึกมาโคร M1 แล้ว: '+ta.value.trim(),'ok'); }catch(_){ } });
+        document.getElementById('macro-test').addEventListener('click',function(){ var r=check(); if(r.err) return;
+          var old=br2MacroText(); try{ localStorage.setItem(MACRO_KEY,ta.value.trim()); }catch(_){ } ed.hidden=true;
+          var dur=r.steps.reduce(function(a,s){return a+s.h+s.w;},0)*MACRO_FRAME;
+          setTimeout(function(){ br2MacroFire(); try{ localStorage.setItem(MACRO_KEY,old); }catch(_){ } },300);
+          setTimeout(function(){ ed.hidden=false; },300+dur+900); });
+      }
+      ta.value=br2MacroText(); ed.hidden=false; ed.__check();
+    }
     // Custom controller editor. Layout is stored per device; D-Pad is intentionally one movable/resizable group.
     var padLayoutKey='br2_controller_layout_v1', padLayout={}, padEditActive=false, padDrag=null;
-    var padNames={dpad:'D-Pad (ทั้งชุด)',triangle:'△ สามเหลี่ยม',square:'□ สี่เหลี่ยม',circle:'○ วงกลม',cross:'✕ กากบาท',l1:'L1',l2:'L2',r1:'R1',r2:'R2',start:'START',select:'SELECT'};
+    var padNames={dpad:'D-Pad (ทั้งชุด)',triangle:'△ สามเหลี่ยม',square:'□ สี่เหลี่ยม',circle:'○ วงกลม',cross:'✕ กากบาท',l1:'L1',l2:'L2',r1:'R1',r2:'R2',start:'START',select:'SELECT',m1:'M1 มาโคร'};
     function loadPadLayout(){try{padLayout=JSON.parse(localStorage.getItem(padLayoutKey)||'{}')||{};}catch(_){padLayout={};}}
     function padItem(id){return pad.querySelector('[data-layout-id="'+id+'"]');}
     function applyPadLayout(){
@@ -5521,6 +5650,7 @@ void main()
         else if(act==='dot1'){ setDotMode(1); }
         else if(act==='dot2'){ setDotMode(2); }
         else if(act==='aspect'){ br2ToggleAspect(); }
+        else if(act==='macro'){ br2MacroOpen(); }
         else if(act==='hd'){ toggleHd(); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
