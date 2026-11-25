@@ -53,6 +53,22 @@ def patch_core(js):
         "MainLoop.runIter(iterFunc);if(!checkIsRunning())return;MainLoop.scheduler()};",
         "main-loop gate",
     )
+    # 1a) expose the main-loop timing setter: when the tab is hidden on a PC the page
+    #     switches RetroArch from requestAnimationFrame (stops in hidden tabs) to setTimeout
+    js = replace_once(
+        js,
+        "var MainLoop={",
+        "globalThis.__br2MainLoopTiming=function(m,v){if(!MainLoop.func)return 1;var run=!!MainLoop.scheduler;MainLoop.timingMode=m;MainLoop.timingValue=v;if(run){MainLoop.pause();MainLoop.resume()}return 0};var MainLoop={",
+        "main-loop timing hook",
+    )
+    # 1a2) RetroArch stops the game when told the window is hidden; on a PC host the page
+    #      sets __br2NoHide so the game keeps running while minimized / in another window
+    js = replace_once(
+        js,
+        '_platform_emscripten_update_window_hidden_cb(document.visibilityState=="hidden")',
+        '_platform_emscripten_update_window_hidden_cb(globalThis.__br2NoHide?false:document.visibilityState=="hidden")',
+        "window hidden hook",
+    )
     # 1b) stream mode: grab the finished frame from RetroArch's OffscreenCanvas on the
     #     emulator thread (Safari cannot read the page's placeholder canvas) and send it
     #     to the page as an ImageBitmap.
