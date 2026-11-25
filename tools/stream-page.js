@@ -112,8 +112,11 @@
       };
       globalThis.__br2OnInfo=function(m){ stLog('เธรดเกม: '+m,'muted'); };
       ST.grabbed=0;
+      // วาดทุกเฟรม: ตอนแท็บถูกซ่อน (บนคอม) requestAnimationFrame หยุด → ใช้ setTimeout แทน
+      var drawGen=0;
+      function loop(gen){ if(gen!==drawGen) return; draw(); if(document.hidden) setTimeout(function(){ loop(gen); },16); else requestAnimationFrame(function(){ loop(gen); }); }
+      ST.restartDraw=function(){ drawGen++; loop(drawGen); };
       function draw(){
-        ST.raf=requestAnimationFrame(draw);
         if(ST.useDirect||performance.now()-(ST.grabAt||0)<500) return;
         try{
           var s=stGameCanvas(); if(!s||!s.width) return;
@@ -122,7 +125,7 @@
           cx.drawImage(s,0,0,w,h); ST.frames++;
         }catch(_){ }
       }
-      draw();
+      ST.restartDraw();
       var ms=cv.captureStream(60);
       ST.media=ms; stAddAudio();
       // ตรวจว่าวาดสำเนาได้จริง (ไม่ดำล้วน) — ถ้าไม่ได้ ลองส่ง canvas ของเกมตรงๆ
@@ -365,13 +368,29 @@
     }
     window.__br2Stream={ST:ST,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
     // ออกจากหน้าเกม / สลับแอป: หยุดเสียงและวิดีโอ (iOS เล่นเสียงของ <video> ต่อในพื้นหลังได้)
+    // คอม (ไม่ใช่มือถือ/แท็บเล็ต): พับจอหรือสลับหน้าต่างแล้วเกมยังเดินต่อ ไม่หลุดจากเพื่อน
+    function stIsDesktop(){
+      try{ if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return false;
+        if(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent)) return false; // iPad ที่แสดงตัวเป็น Mac
+        return !matchMedia('(pointer:coarse)').matches; }catch(_){ return true; }
+    }
+    if(stIsDesktop()) globalThis.__br2NoHide=true; // คอม: อย่าบอก RetroArch ว่าหน้าต่างถูกซ่อน (มันจะหยุดเกม)
+    function stKeepRunningHidden(hidden){
+      try{ if(stRole()===1&&typeof globalThis.__br2MainLoopTiming==='function'){
+        if(hidden) globalThis.__br2MainLoopTiming(0,16); else globalThis.__br2MainLoopTiming(1,1);
+        ST.bgTiming=hidden; } }catch(_){ }
+      try{ if(ST.restartDraw) ST.restartDraw(); }catch(_){ }
+      if(hidden&&!ST.bgLogged){ ST.bgLogged=true; stLog('พับจอ/สลับหน้าต่าง → เกมเดินต่อ (คอม)','muted'); }
+    }
     function stOnHidden(){
+      if(stIsDesktop()){ stKeepRunningHidden(true); return; }
       try{ if(ST.video){ ST.video.muted=true; ST.video.pause(); } }catch(_){ }
       try{ if(ST.audioDest&&ST.audioDest.context&&ST.audioDest.context.state==='running') ST.audioDest.context.suspend(); }catch(_){ }
       // P1: หยุดเกมชั่วคราว (การส่งภาพทำให้ iOS ไม่พักหน้าเว็บ เกมกับเสียงจึงเล่นต่อในพื้นหลัง)
       try{ if(stRole()===1&&ng&&!ST.hidePaused){ ng.pause(); ST.hidePaused=true; stLog('สลับแอป → หยุดเกมชั่วคราว','muted'); } }catch(_){ }
     }
     function stOnVisible(){
+      if(ST.bgTiming!==undefined&&stIsDesktop()){ stKeepRunningHidden(false); }
       try{ if(ST.video){ ST.video.play().catch(function(){}); if(ST.tap&&ST.video.srcObject&&ST.video.srcObject.getAudioTracks().length) ST.tap.style.display=''; } }catch(_){ }
       try{ if(ST.audioDest&&ST.audioDest.context&&ST.audioDest.context.state==='suspended') ST.audioDest.context.resume(); }catch(_){ }
       try{ if(ST.hidePaused&&ng){ ng.resume(); ST.hidePaused=false; stLog('กลับมาที่เกม → เล่นต่อ','muted'); } }catch(_){ }

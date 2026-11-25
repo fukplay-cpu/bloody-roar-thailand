@@ -3646,6 +3646,7 @@ try {
     function raCfg(){ var c=Object.assign({},BINDS);
       c.savestate_thumbnail_enable=false;
       c.audio_sync=true; c.audio_rate_control=true; c.audio_latency=32;   // défaut 64 ms → moins d'offset
+      c.pause_nonactive=false; // ไม่หยุดเกมเมื่อคลิกไปหน้าต่างอื่น (บนคอม)
       return c; }
     // ---------- Filtre d'affichage dot (RetroArch handheld/dot, Themaister, domaine public) ----------
     // Le VRAI shader dot (bloom par distance aux centres de pixels). 1 passe, filter_linear=false,
