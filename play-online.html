@@ -4096,6 +4096,7 @@ try {
         if(PT){ [].concat(PT.runningWorkers||[],PT.unusedWorkers||[]).forEach(function(w){ try{ w.postMessage({cmd:'br2grab',on:!!on,w:ST.capW}); n++; }catch(_){ } }); } }catch(_){ }
       stLog((on?'เปิด':'ปิด')+'การจับภาพในเธรดเกม (threads '+n+')','muted');
     }
+    ST.grab=stGrab; // ใช้ทดสอบ
     async function stHostOffer(){
       if(!ng){ stLog('ยังไม่ได้เปิดเกม — รอเกมเปิดก่อน','muted'); return; }
       await stLoadTurn();
@@ -4302,7 +4303,10 @@ try {
         var rep=await pc.getStats(), pair=null, cands={};
         rep.forEach(function(s){ if(s.type==='candidate-pair'&&s.state==='succeeded'&&(s.nominated||s.selected)) pair=s; if(s.type==='local-candidate'||s.type==='remote-candidate') cands[s.id]=s; });
         rep.forEach(function(s){
-          if(s.type==='inbound-rtp'&&s.kind==='video'){ ST.decFps=s.framesDecoded-(ST.lastDec||0); ST.lastDec=s.framesDecoded; ST.kbps=Math.round(((s.bytesReceived||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesReceived||0; }
+          if(s.type==='inbound-rtp'&&s.kind==='video'){ ST.decFps=s.framesDecoded-(ST.lastDec||0); ST.lastDec=s.framesDecoded;
+            // ความหน่วงของบัฟเฟอร์ภาพ (เฉลี่ยช่วง 1 วินาทีล่าสุด)
+            var jd=(s.jitterBufferDelay||0)-(ST.lastJbd||0), je=(s.jitterBufferEmittedCount||0)-(ST.lastJbe||0); ST.lastJbd=s.jitterBufferDelay||0; ST.lastJbe=s.jitterBufferEmittedCount||0;
+            if(je>0) ST.jbMs=Math.round(1000*jd/je); ST.kbps=Math.round(((s.bytesReceived||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesReceived||0; }
           if(s.type==='outbound-rtp'&&s.kind==='video'){ ST.encFps=s.framesEncoded-(ST.lastEnc||0); ST.lastEnc=s.framesEncoded; ST.kbps=Math.round(((s.bytesSent||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesSent||0; }
         });
         if(pair){ if(pair.currentRoundTripTime) ST.rtt=pair.currentRoundTripTime*1000;
@@ -4311,7 +4315,32 @@ try {
           ST.route=relay?'ผ่านเซิร์ฟเวอร์':'เชื่อมตรง'; }
       }catch(_){ }
     }
-    window.__br2Stream={ST:ST,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
+    // ===== วิเคราะห์อาการหน่วง: บันทึกทุก 30 วินาที + กู้ภาพเองถ้าภาพหน่วงสะสม (P2) =====
+    var DG={lastF:0,lastT:0,lag:0,tick:0,bad:0,healAt:0};
+    (function(){ var last=performance.now(); setInterval(function(){ var n=performance.now(); DG.lag=Math.max(DG.lag,n-last-100); last=n; },100); })();
+    function stDiag(){
+      if(!ST.on) return;
+      var now=performance.now(), line;
+      if(stRole()===1){
+        var fi=window.__br2FrameInfo&&window.__br2FrameInfo(), f=fi?fi.frame:0, dt=(now-(DG.lastT||now))/1000;
+        var gfps=DG.lastT&&dt>0?Math.round((f-DG.lastF)/dt):0, sfps=DG.lastT&&dt>0?Math.round(((ST.frames||0)-(DG.lastS||0))/dt):0;
+        DG.lastF=f; DG.lastS=ST.frames||0;
+        var mem=''; try{ if(performance.memory) mem=' · หน่วยความจำ '+Math.round(performance.memory.usedJSHeapSize/1048576)+'MB'; }catch(_){ }
+        line='วิเคราะห์ P1: เกม '+gfps+' fps · วาดภาพส่ง '+sfps+' fps · ส่งจริง '+(ST.encFps||0)+' fps · หน้าเว็บสะดุดสูงสุด '+Math.round(DG.lag)+'ms · ping '+Math.round(ST.rtt||0)+'ms'+mem;
+      } else {
+        line='วิเคราะห์ P2: ภาพ '+(ST.decFps||0)+' fps · บัฟเฟอร์ภาพ '+(ST.jbMs||0)+'ms · หน้าเว็บสะดุดสูงสุด '+Math.round(DG.lag)+'ms · ping '+Math.round(ST.rtt||0)+'ms';
+      }
+      DG.lastT=now; DG.lag=0; stLog(line,'muted');
+      (ST.diag=ST.diag||[]).push(new Date().toLocaleTimeString()+' '+line); if(ST.diag.length>60) ST.diag.shift();
+    }
+    // P2: ถ้าบัฟเฟอร์ภาพหน่วงเกิน 400ms ติดกัน 5 วินาที → ต่อภาพใหม่เอง (เหมือนออกแล้วเข้าใหม่ แต่ไม่ต้องทำเอง)
+    function stHeal(){
+      if(stRole()!==2||!ST.pc||ST.pc.connectionState!=='connected'||ST.peerAway||document.hidden) { DG.bad=0; return; }
+      if((ST.jbMs||0)>400) DG.bad++; else DG.bad=0;
+      if(DG.bad>=5&&Date.now()-DG.healAt>30000){ DG.bad=0; DG.healAt=Date.now(); stLog('ภาพหน่วงสะสม ('+ST.jbMs+'ms) → ต่อภาพใหม่อัตโนมัติ','err'); stClosePc(); stHelloSoon(0); }
+    }
+    setInterval(function(){ stHeal(); if(++DG.tick%30===0) stDiag(); },1000);
+    window.__br2Stream={ST:ST,diag:stDiag,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
     // ออกจากหน้าเกม / สลับแอป: หยุดเสียงและวิดีโอ (iOS เล่นเสียงของ <video> ต่อในพื้นหลังได้)
     // คอม (ไม่ใช่มือถือ/แท็บเล็ต): พับจอหรือสลับหน้าต่างแล้วเกมยังเดินต่อ ไม่หลุดจากเพื่อน
     function stIsDesktop(){
