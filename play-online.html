@@ -4262,6 +4262,7 @@ try {
       if(d.t==='sh'){ if(stRole()===1) stHostOffer().catch(function(e){ stLog('สร้างการเชื่อมต่อไม่สำเร็จ: '+(e.message||e),'err'); }); return true; }
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
       if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
+      if(d.t==='sa'){ stPeerAway(!!d.a, d.p); return true; }
       if(d.t==='rdy'||d.t==='i'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดล็อกเฟรม"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return true; }
       return false;
     }
@@ -4310,8 +4311,22 @@ try {
       try{ if(ST.restartDraw) ST.restartDraw(); }catch(_){ }
       if(hidden&&!ST.bgLogged){ ST.bgLogged=true; stLog('พับจอ/สลับหน้าต่าง → เกมเดินต่อ (คอม)','muted'); }
     }
+    // แจ้งอีกเครื่องว่าเราพับจอ/กลับมา + ป้ายบนจอ "รออีกฝ่ายกลับมา"
+    function stSendAway(a){ try{ lsSendRaw({t:'sa',p:stRole(),a:a?1:0}); }catch(_){ } }
+    function stPeerAway(a,p){
+      ST.peerAway=a;
+      var el=document.getElementById('br2-away');
+      if(!el){ el=document.createElement('div'); el.id='br2-away';
+        el.style.cssText='position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:50;padding:12px 18px;border-radius:12px;background:rgba(0,0,0,.78);color:#ffd27a;font:600 15px system-ui,sans-serif;text-align:center;pointer-events:none;border:1px solid #c9a24b';
+        document.body.appendChild(el); }
+      el.textContent=(p===1?'P1':'P2')+' พับจออยู่ · รอกลับมาเล่นต่อ…';
+      el.style.display=a?'':'none';
+      stLog(a?((p===1?'P1':'P2')+' พับจอ'):((p===1?'P1':'P2')+' กลับมาแล้ว'),'muted');
+    }
+    ST.testAway=stPeerAway; // ใช้ทดสอบ
     function stOnHidden(){
       if(stIsDesktop()){ stKeepRunningHidden(true); return; }
+      stSendAway(true);
       try{ if(ST.video){ ST.video.muted=true; ST.video.pause(); } }catch(_){ }
       try{ if(ST.audioDest&&ST.audioDest.context&&ST.audioDest.context.state==='running') ST.audioDest.context.suspend(); }catch(_){ }
       // P1: หยุดเกมชั่วคราว (การส่งภาพทำให้ iOS ไม่พักหน้าเว็บ เกมกับเสียงจึงเล่นต่อในพื้นหลัง)
@@ -4322,6 +4337,16 @@ try {
       try{ if(ST.video){ ST.video.play().catch(function(){}); if(ST.tap&&ST.video.srcObject&&ST.video.srcObject.getAudioTracks().length) ST.tap.style.display=''; } }catch(_){ }
       try{ if(ST.audioDest&&ST.audioDest.context&&ST.audioDest.context.state==='suspended') ST.audioDest.context.resume(); }catch(_){ }
       try{ if(ST.hidePaused&&ng){ ng.resume(); ST.hidePaused=false; stLog('กลับมาที่เกม → เล่นต่อ','muted'); } }catch(_){ }
+      if(!stIsDesktop()) stResumeLinks();
+    }
+    // มือถือกลับมาจากพับจอ: iOS อาจตัดการเชื่อมต่อไปแล้ว → ต่อห้องและต่อภาพใหม่ทันที
+    function stResumeLinks(){
+      try{ if(!LS.ws||LS.ws.readyState>1){ stLog('ต่อห้องใหม่หลังพับจอ','muted'); lsConnect(); } }catch(_){ }
+      var tries=0;
+      (function wait(){ // รอห้องเชื่อมต่อแล้วค่อยแจ้ง/ขอภาพใหม่
+        if(LS.ws&&LS.ws.readyState===1){ stSendAway(false); if(stRole()===2){ var cs=ST.pc&&ST.pc.connectionState; if(cs!=='connected'){ stClosePc(); } stHelloSoon(0); } return; }
+        if(++tries<40) setTimeout(wait,250);
+      })();
     }
     document.addEventListener('visibilitychange',function(){ if(!ST.on) return; if(document.hidden) stOnHidden(); else stOnVisible(); });
     window.addEventListener('pagehide',function(){ if(!ST.on) return; stOnHidden(); stClosePc(); });
