@@ -193,8 +193,9 @@
 
     // ----- มาโคร M1 ของ P2: ส่งคำสั่งทั้งชุดให้ P1 เป็นคนกด (จังหวะไม่เพี้ยนตามปิง) -----
     function stOnMacro(d){
-      if(!ng||!d||!Array.isArray(d.q)) return;
+      if(!ng||!d||(!Array.isArray(d.q)&&!d.stop)) return;
       if(d.id===ST.lastMacroId) return; ST.lastMacroId=d.id; // มาทั้งช่องตรงและผ่านเซิร์ฟเวอร์ → ใช้ครั้งเดียว
+      if(d.stop){ if(typeof window.__br2MacroStop==='function') window.__br2MacroStop('p2'); return; } // P2 กดซ้ำ = หยุดมาโคร
       var steps=[];
       for(var i=0;i<d.q.length&&i<60;i++){ var q=d.q[i]; if(!Array.isArray(q)) return;
         var b=String(q[0]||'').split('+').filter(function(n){ return n&&LS_BTN.indexOf(n)>=0; });
@@ -204,12 +205,22 @@
       if((ST.macroLogged=(ST.macroLogged||0)+1)<=3) stLog('P2 ใช้มาโคร M1','muted');
     }
     ST.onMacro=stOnMacro; // ใช้ทดสอบ
-    window.__br2MacroRemote=function(steps){
+    function stMacroSend(msg){ var js=JSON.stringify(msg); if(js.length>2000){ stLog('มาโครยาวเกินไป ส่งไม่ได้','err'); return false; }
+      try{ if(ST.dc&&ST.dc.readyState==='open') ST.dc.send(js); }catch(_){ } lsSendRaw(msg); return true; }
+    function stMacroLight(n){ ['btn-m1','btn-m2'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.toggle('on',id==='btn-m'+n); }); }
+    window.__br2MacroRemote=function(steps,n){
       if(stRole()!==2) return;
       var msg={t:'sm',id:(Date.now()%1000000000)+'-'+(++ST.seq),q:steps.map(function(s){ return [s.b.join('+'),s.h,s.w]; })};
-      var js=JSON.stringify(msg); if(js.length>2000){ stLog('มาโครยาวเกินไป ส่งไม่ได้','err'); return; }
-      try{ if(ST.dc&&ST.dc.readyState==='open') ST.dc.send(js); }catch(_){ }
-      lsSendRaw(msg);
+      if(!stMacroSend(msg)) return;
+      // P2 ไม่รู้ว่าเครื่อง P1 กดเสร็จเมื่อไร → ประมาณจากความยาวมาโคร (1 เฟรม = 20ms) + เผื่อปิง
+      var fr=0; steps.forEach(function(s){ fr+=s.h+s.w; });
+      var ms=fr*20+300; ST.remoteMacro={n:n||1,until:performance.now()+ms}; stMacroLight(n||1);
+      clearTimeout(ST.remoteMacroT); ST.remoteMacroT=setTimeout(function(){ ST.remoteMacro=null; stMacroLight(0); },ms);
+    };
+    window.__br2MacroRemoteBusy=function(){ var m=ST.remoteMacro; return m&&performance.now()<m.until?m.n:0; };
+    window.__br2MacroRemoteStop=function(){
+      clearTimeout(ST.remoteMacroT); ST.remoteMacro=null; stMacroLight(0);
+      stMacroSend({t:'sm',id:(Date.now()%1000000000)+'-'+(++ST.seq),stop:1});
     };
 
     // ----- P2: รับภาพ -----

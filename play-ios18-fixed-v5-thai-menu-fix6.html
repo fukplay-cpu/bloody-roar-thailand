@@ -4200,7 +4200,7 @@ void main()
       if(steps.length>60) return {err:'คำสั่งยาวเกินไป (สูงสุด 60 จังหวะ)'};
       return {steps:steps};
     }
-    var br2MacroBusy={};
+    var br2MacroBusy={}, br2MacroStopFn={}, br2MacroCur={};
     // รันมาโคร: press(name,on) คือฟังก์ชันกดปุ่ม · key แยกคิวของแต่ละผู้เล่น (กดซ้ำระหว่างทำงานจะไม่ซ้อน)
     // นับตามเฟรมจริงของเกม (ตัวนับ br2Frame) → เครื่องกระตุกก็ยังได้จังหวะเท่าเดิม · ถ้าเกมไม่เดิน ใช้นาฬิกาแทน
     function br2MacroRun(steps,press,key){
@@ -4213,7 +4213,9 @@ void main()
         Object.keys(held).forEach(function(n){ try{ press(n,false); }catch(_){ } }); held={}; br2MacroBusy[key]=false;
         var i=br2FrameHooks.indexOf(onFrame); if(i>=0) br2FrameHooks.splice(i,1);
         if(key==='p1') ['btn-m1','btn-m2'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('on'); });
+        delete br2MacroStopFn[key]; delete br2MacroCur[key];
       }
+      br2MacroStopFn[key]=function(){ idx=ev.length; done(); };
       function onFrame(fr){ if(fr!==lastF){ lastF=fr; lastFT=performance.now(); } apply(fr-f0); if(idx>=ev.length) done(); }
       if(useFrames){
         br2FrameHooks.push(onFrame); apply(0); if(idx>=ev.length){ done(); return true; }
@@ -4226,18 +4228,26 @@ void main()
       return true;
     }
     window.__br2MacroRun=br2MacroRun;
+    // หยุดมาโครที่กำลังทำงาน (ปล่อยปุ่มที่มาโครกดค้างไว้ทั้งหมด)
+    function br2MacroStop(key){ var f=br2MacroStopFn[key||'p1']; if(f){ f(); return true; } return false; }
+    window.__br2MacroStop=br2MacroStop;
     function br2MacroFire(n){
       n=n===2?2:1;
       var r=br2MacroParse(br2MacroText(n)); if(r.err){ try{ log('มาโคร M'+n+': '+r.err,'err'); }catch(_){ } return; }
-      if(window.__br2Viewer&&typeof window.__br2MacroRemote==='function'){ window.__br2MacroRemote(r.steps); return; } // P2: ให้เครื่อง P1 กดแทน จังหวะจะไม่เพี้ยนตามปิง
+      if(window.__br2Viewer&&typeof window.__br2MacroRemote==='function'){
+        // P2: กดปุ่มเดิมซ้ำระหว่างมาโครทำงาน = หยุดมาโคร
+        if(typeof window.__br2MacroRemoteBusy==='function'&&window.__br2MacroRemoteBusy()){ if(window.__br2MacroRemoteBusy()===n) window.__br2MacroRemoteStop(); return; }
+        window.__br2MacroRemote(r.steps,n); return; } // P2: ให้เครื่อง P1 กดแทน จังหวะจะไม่เพี้ยนตามปิง
       if(!ng) return;
+      // กดปุ่มเดิมซ้ำระหว่างมาโครทำงาน = หยุดมาโคร (ไว้หยุดตอนคอมโบหลุด แล้วสวนกลับเอง)
+      if(br2MacroBusy.p1){ if(br2MacroCur.p1===n){ br2MacroStop('p1'); try{ log('หยุดมาโคร M'+n,'muted'); }catch(_){ } } return; }
       var b=document.getElementById('btn-m'+n);
-      if(br2MacroRun(r.steps,function(k,on){ br2Input(k,on); },'p1')&&b) b.classList.add('on');
+      if(br2MacroRun(r.steps,function(k,on){ br2Input(k,on); },'p1')){ if(br2MacroBusy.p1) br2MacroCur.p1=n; if(b&&br2MacroBusy.p1) b.classList.add('on'); }
     }
     function br2MacroBindBtn(){
       [1,2].forEach(function(n){
         var b=document.getElementById('btn-m'+n); if(!b||b.__bound) return; b.__bound=true;
-        b.addEventListener('pointerdown',function(e){ e.preventDefault(); if(padEditActive) return; br2MacroFire(n); if(window.__br2Viewer){ b.classList.add('on'); setTimeout(function(){ b.classList.remove('on'); },150); } });
+        b.addEventListener('pointerdown',function(e){ e.preventDefault(); if(padEditActive) return; br2MacroFire(n); });
         ['touchstart','touchend'].forEach(function(t){ b.addEventListener(t,function(e){ if(e.cancelable&&!padEditActive) e.preventDefault(); },{passive:false}); });
       });
     }
