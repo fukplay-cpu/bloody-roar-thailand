@@ -56,6 +56,11 @@
         <option value="8x">8 เท่า</option>
       </select></label>
     <label><input type="checkbox" id="pgxp" checked> แก้ภาพสั่น (PGXP)</label>
+    <label>จังหวะภาพ (จอ 120/144/165Hz):
+      <select id="pace">
+        <option value="timer" selected>ล็อก 60 ครั้ง/วินาที (แนะนำ)</option>
+        <option value="raf">ตามจอ (ค่าเดิมของตัวจำลอง)</option>
+      </select></label>
     <label>แก้ท่าไม้ตาย (ทดลอง · ใช้กับการ์ดจอ):
       <select id="fix">
         <option value="a">A: ค่าเดิม</option>
@@ -111,9 +116,9 @@ window.addEventListener('error',function(e){ L('ERROR '+(e.message||e)); });
 
   $('go').addEventListener('click',function(){
     if(!biosBlob||!gameFile) return; $('go').disabled=true;
-    var rdr=$('rdr').value, res=$('res').value, pgxp=$('pgxp').checked, fix=$('fix').value;
+    var rdr=$('rdr').value, res=$('res').value, pgxp=$('pgxp').checked, fix=$('fix').value, pace=$('pace').value;
     var extra={a:'',b:'beetle_psx_hw_renderer_software_fb = "enabled"\n',c:'beetle_psx_hw_renderer_software_fb = "enabled"\nbeetle_psx_hw_depth = "32bpp"\n',d:'beetle_psx_hw_renderer_software_fb = "enabled"\nbeetle_psx_hw_line_render = "disabled"\n'}[fix]||'';
-    window.__info='game '+gameFile.size+'B · bios '+biosBlob.size+'B · '+rdr+' '+res+(pgxp?' pgxp':'')+' fix '+fix+' · cue '+(cueText?'orig':'auto')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
+    window.__info='game '+gameFile.size+'B · bios '+biosBlob.size+'B · '+rdr+' '+res+(pgxp?' pgxp':'')+' fix '+fix+' pace '+pace+' · cue '+(cueText?'orig':'auto')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
     st('go-st','กำลังโหลดตัวจำลอง…');
     var canvas=$('canvas');
     window.Module={
@@ -141,13 +146,16 @@ window.addEventListener('error',function(e){ L('ERROR '+(e.message||e)); });
             'beetle_psx_hw_pgxp_mode = "'+(pgxp?'memory only':'disabled')+'"\nbeetle_psx_hw_pgxp_texture = "'+(pgxp?'enabled':'disabled')+'"\n'+
             'beetle_psx_hw_dither_mode = "1x(native)"\nbeetle_psx_hw_filter = "nearest"\n'+extra);
           FS.writeFile('/home/web_user/retroarch/userdata/retroarch.cfg',
-            'rgui_show_start_screen = "false"\nfps_show = "true"\nvideo_vsync = "true"\nsavefile_directory = "/home/web_user/retroarch/userdata/saves"\n'+
+            'rgui_show_start_screen = "false"\nfps_show = "true"\nvideo_vsync = "true"\naudio_sync = "true"\naudio_rate_control = "true"\naudio_latency = "32"\nsavefile_directory = "/home/web_user/retroarch/userdata/saves"\n'+
             'system_directory = "/home/web_user/retroarch/userdata/system"\ninput_menu_toggle = "f1"\ninput_player1_start = "enter"\ninput_player1_select = "rshift"\n'+
             'input_player1_a = "x"\ninput_player1_b = "z"\ninput_player1_x = "s"\ninput_player1_y = "a"\ninput_player1_l = "q"\ninput_player1_r = "w"\n'+
             'input_exit_emulator = "nul"\ninput_toggle_fullscreen = "nul"\n');
           $('setup').style.display='none'; canvas.style.display='block'; $('keys').style.display='block';
           canvas.width=innerWidth*devicePixelRatio|0; canvas.height=innerHeight*devicePixelRatio|0;
           L('callMain'); Module.callMain(Module.arguments); canvas.focus();
+          // จอ 165Hz: ให้ตัวจำลองเดินเฟรมด้วยตัวจับเวลา 60.1 ครั้ง/วินาที (เท่าเครื่อง PS1 NTSC) แทนการวิ่งตามรอบจอ
+          if(pace==='timer'){ var setT=function(){ try{ if(typeof _emscripten_set_main_loop_timing==='function'){ _emscripten_set_main_loop_timing(0,1000/60.0988); L('pacing: timer 60.1'); return true; } }catch(e){ L('pacing error '+e); } return false; };
+            var tries=0; (function again(){ if(!setT()&&++tries<20) setTimeout(again,250); })(); setTimeout(setT,3000); }
           setTimeout(function(){ $('keys').style.display='none'; },8000);
         }catch(e){ L('START ERROR '+(e&&e.stack||e)); showLog(); }
       }
