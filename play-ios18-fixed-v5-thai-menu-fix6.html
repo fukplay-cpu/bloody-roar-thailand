@@ -4066,19 +4066,19 @@ void main()
     // วิเคราะห์: หาไบต์ที่ "ชุดค่าตอนสู้" กับ "ชุดค่าตอนไม่ได้สู้" ไม่ซ้ำกันเลยในทุกตัวอย่าง → ยิ่งตัวอย่างหลากหลาย ยิ่งแม่น
     function rpAnalyze(){
       if(RP.a.length<5||RP.b.length<5){ rpOut('ต้องเก็บอย่างน้อยแบบละ 5 ครั้ง (ตอนนี้ ไม่ได้สู้ '+RP.a.length+' / กำลังสู้ '+RP.b.length+')'); return; }
+      // หา "สถานะของเกม": ตอนสู้มีค่าน้อยแบบ (≤2) และไม่ซ้ำกับค่าตอนไม่ได้สู้ (หน้าอื่นมีได้หลายค่า ≤16)
       var n=0x200000, cand=[];
       for(var i=0;i<n;i++){
-        var A=0,B=0, x, y; // บิตมาสก์ค่า (เก็บแบบชุดเล็ก ≤ 4 ค่า)
-        var av=[], bv=[];
-        for(x=0;x<RP.a.length;x++){ var v=RP.a[x][i]; if(av.indexOf(v)<0){ av.push(v); if(av.length>4) break; } }
-        if(av.length>4) continue;
-        var bad=false;
-        for(y=0;y<RP.b.length;y++){ var w=RP.b[y][i]; if(av.indexOf(w)>=0){ bad=true; break; } if(bv.indexOf(w)<0){ bv.push(w); if(bv.length>4){ bad=true; break; } } }
-        if(bad) continue;
-        cand.push([i,bv,av.length+bv.length]);
+        var bv=[], ok=true, y, x;
+        for(y=0;y<RP.b.length;y++){ var w=RP.b[y][i]; if(bv.indexOf(w)<0){ bv.push(w); if(bv.length>2){ ok=false; break; } } }
+        if(!ok) continue;
+        var av=[];
+        for(x=0;x<RP.a.length;x++){ var v=RP.a[x][i]; if(bv.indexOf(v)>=0){ ok=false; break; } if(av.indexOf(v)<0){ av.push(v); if(av.length>16){ ok=false; break; } } }
+        if(!ok) continue;
+        cand.push([i,bv,bv.length*100+av.length]);
       }
-      cand.sort(function(p,q){ return p[2]-q[2]; }); // ค่าน้อยแบบ = นิ่งกว่า
-      var keep=cand.slice(0,48).map(function(c){ return [c[0],c[1]]; });
+      cand.sort(function(p,q){ return p[2]-q[2]; });
+      var keep=cand.slice(0,16).map(function(c){ return [c[0],c[1]]; });
       if(!keep.length){ rpOut('ไม่เจอค่าที่แยกได้ชัด ลองเก็บตัวอย่างใหม่'); return; }
       try{ localStorage.setItem('br2_fight_sig',JSON.stringify(keep)); }catch(_){ }
       FIGHT_LEARNED=keep; FD.state=null; FD.last=null; FD.stable=0;
@@ -4091,7 +4091,7 @@ void main()
         var d=document.createElement('section'); d.id='rp-panel';
         d.style.cssText='position:fixed;z-index:31;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);width:min(420px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:auto;box-sizing:border-box;padding:12px;background:rgba(12,12,14,.97);border:1px solid #c9a24b;border-radius:12px;color:#f4f4f4;font:13px system-ui,sans-serif';
         d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong>🧪 ทดสอบอ่าน RAM</strong><button type="button" id="rp-x">✕</button></div>'
-          +'<p style="margin:4px 0 8px;font-size:12px;color:#c4c4c4;line-height:1.5">เก็บ<b>แบบละ 6–8 ครั้ง ให้ต่างกันมากที่สุด</b><br>• ไม่ได้สู้: หน้าแรก, เมนูหลัก, Options, เลือกตัว, หน้า VS, หน้าชนะ/แพ้, Continue<br>• กำลังสู้: คนละตัวละคร คนละฉาก, Practice, Arcade, ตอนแปลงร่าง, ตอนเลือดใกล้หมด<br>แล้วกด “วิเคราะห์”</p>'
+          +'<p style="margin:4px 0 8px;font-size:12px;color:#c4c4c4;line-height:1.5">เก็บ<b>แบบละ 6–8 ครั้ง ให้ต่างกันมากที่สุด</b><br>• ไม่ได้สู้: หน้าแรก, เมนูหลัก, Options, เลือกตัว, หน้า VS, หน้าชนะ/แพ้, Continue<br>• กำลังสู้: คนละตัวละคร คนละฉาก, <b>ตอนยืนนิ่งไม่กดอะไร</b>, ตอนออกท่า, ตอนล้ม, ตอนแปลงร่าง, Practice และ Arcade<br>แล้วกด “วิเคราะห์”</p>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button type="button" id="rp-a">ไม่ได้สู้</button><button type="button" id="rp-b">กำลังสู้</button></div>'
           +'<button type="button" id="rp-go" style="width:100%;margin-top:6px">วิเคราะห์</button>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rp-copy" style="display:none">คัดลอกผล</button><button type="button" id="rp-reset">ล้างตัวอย่าง</button></div>'
