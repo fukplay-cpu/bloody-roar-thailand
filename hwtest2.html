@@ -56,6 +56,13 @@
         <option value="8x">8 เท่า</option>
       </select></label>
     <label><input type="checkbox" id="pgxp" checked> แก้ภาพสั่น (PGXP)</label>
+    <label>แก้ท่าไม้ตาย (ทดลอง · ใช้กับการ์ดจอ):
+      <select id="fix">
+        <option value="a">A: ค่าเดิม</option>
+        <option value="b">B: ให้ CPU ช่วยอ่านภาพหน้าจอ</option>
+        <option value="c">C: B + สี 32 บิต</option>
+        <option value="d">D: B + ปิดการวาดเส้นแบบพิเศษ</option>
+      </select></label>
   </div>
 
   <button id="go" disabled>▶ เริ่มทดสอบ</button>
@@ -104,8 +111,9 @@ window.addEventListener('error',function(e){ L('ERROR '+(e.message||e)); });
 
   $('go').addEventListener('click',function(){
     if(!biosBlob||!gameFile) return; $('go').disabled=true;
-    var rdr=$('rdr').value, res=$('res').value, pgxp=$('pgxp').checked;
-    window.__info='game '+gameFile.size+'B · bios '+biosBlob.size+'B · '+rdr+' '+res+(pgxp?' pgxp':'')+' · cue '+(cueText?'orig':'auto')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
+    var rdr=$('rdr').value, res=$('res').value, pgxp=$('pgxp').checked, fix=$('fix').value;
+    var extra={a:'',b:'beetle_psx_hw_renderer_software_fb = "enabled"\n',c:'beetle_psx_hw_renderer_software_fb = "enabled"\nbeetle_psx_hw_depth = "32bpp"\n',d:'beetle_psx_hw_renderer_software_fb = "enabled"\nbeetle_psx_hw_line_render = "disabled"\n'}[fix]||'';
+    window.__info='game '+gameFile.size+'B · bios '+biosBlob.size+'B · '+rdr+' '+res+(pgxp?' pgxp':'')+' fix '+fix+' · cue '+(cueText?'orig':'auto')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
     st('go-st','กำลังโหลดตัวจำลอง…');
     var canvas=$('canvas');
     window.Module={
@@ -131,7 +139,7 @@ window.addEventListener('error',function(e){ L('ERROR '+(e.message||e)); });
           FS.writeFile('/home/web_user/retroarch/userdata/retroarch-core-options.cfg',
             'beetle_psx_hw_renderer = "'+rdr+'"\nbeetle_psx_hw_internal_resolution = "'+res+'"\n'+
             'beetle_psx_hw_pgxp_mode = "'+(pgxp?'memory only':'disabled')+'"\nbeetle_psx_hw_pgxp_texture = "'+(pgxp?'enabled':'disabled')+'"\n'+
-            'beetle_psx_hw_dither_mode = "1x(native)"\nbeetle_psx_hw_filter = "nearest"\n');
+            'beetle_psx_hw_dither_mode = "1x(native)"\nbeetle_psx_hw_filter = "nearest"\n'+extra);
           FS.writeFile('/home/web_user/retroarch/userdata/retroarch.cfg',
             'rgui_show_start_screen = "false"\nfps_show = "true"\nvideo_vsync = "true"\nsavefile_directory = "/home/web_user/retroarch/userdata/saves"\n'+
             'system_directory = "/home/web_user/retroarch/userdata/system"\ninput_menu_toggle = "f1"\ninput_player1_start = "enter"\ninput_player1_select = "rshift"\n'+
