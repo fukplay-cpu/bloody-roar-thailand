@@ -4095,6 +4095,7 @@ void main()
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button type="button" id="rp-a">ไม่ได้สู้</button><button type="button" id="rp-b">กำลังสู้</button></div>'
           +'<button type="button" id="rp-go" style="width:100%;margin-top:6px">วิเคราะห์</button>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rp-copy" style="display:none">คัดลอกผล</button><button type="button" id="rp-reset">ล้างตัวอย่าง</button></div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rp-rec">⏺ บันทึกค่า</button><button type="button" id="rp-reccopy">คัดลอกบันทึก</button></div>'
           +'<div id="rp-live" style="margin-top:8px;font-size:12px;color:#ffd27a"></div>'
           +'<pre id="rp-out" style="white-space:pre-wrap;font:12px ui-monospace,monospace;background:#000;border:1px solid #444;border-radius:8px;padding:8px;margin:8px 0 0;min-height:3em">พร้อม</pre>';
         document.body.appendChild(d); RP.el=d;
@@ -4103,6 +4104,14 @@ void main()
         document.getElementById('rp-a').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(false).then(function(){ d.hidden=false; }); },120); };
         document.getElementById('rp-b').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(true).then(function(){ d.hidden=false; }); },120); };
         document.getElementById('rp-go').onclick=rpAnalyze;
+        document.getElementById('rp-rec').onclick=function(){ var b=this;
+          if(RP.recT){ clearInterval(RP.recT); RP.recT=null; b.textContent='⏺ บันทึกค่า'; rpOut('หยุดบันทึกแล้ว · '+(RP.rec||[]).length+' รายการ · กด "คัดลอกบันทึก"'); return; }
+          RP.rec=[]; RP.rec0=Date.now(); var last='';
+          RP.recT=setInterval(function(){ var H=rpHeap(); if(!H||RP.base<0) return; var v=H[RP.base+0x1E43CE]+','+H[RP.base+0x1E65A2];
+            if(v!==last){ last=v; RP.rec.push(((Date.now()-RP.rec0)/1000).toFixed(1)+':'+v); if(RP.rec.length>400) RP.rec.shift(); } },100);
+          b.textContent='⏹ หยุดบันทึก'; d.hidden=true; };
+        document.getElementById('rp-reccopy').onclick=function(){ var t='BR2LOG '+(RP.rec||[]).join(' ');
+          if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ rpOut('คัดลอกแล้ว ✅ วางส่งให้ Claude'); },function(){ window.prompt('คัดลอกข้อความนี้',t); }); else window.prompt('คัดลอกข้อความนี้',t); };
         document.getElementById('rp-reset').onclick=function(){ RP.a=[]; RP.b=[]; rpOut('ล้างตัวอย่างแล้ว · เริ่มเก็บใหม่ได้'); };
         document.getElementById('rp-copy').onclick=function(){ var t='BR2SIG '+(RP.lastSig||localStorage.getItem('br2_fight_sig')||'');
           var done=function(){ rpOut('คัดลอกแล้ว ✅ วางส่งในแชทกับ Claude ได้เลย'); };
