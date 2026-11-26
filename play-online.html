@@ -4935,9 +4935,10 @@ void main()
     // ===== ตรวจว่า "กำลังสู้" จาก RAM ของเกม (เวอร์ชัน USA) — ได้จากการทดสอบบน iPhone =====
     // 14 ตำแหน่งที่ค่าต่างกันชัดเจนระหว่างตอนสู้/ไม่ได้สู้ → ให้โหวตรวมกัน (ตรงค่าตอนสู้ ≥ 11 จุด = กำลังสู้)
     // ค่าที่เรียนรู้จากการทดสอบบน iPhone (เกม USA): 2 ไบต์ที่เป็นสถานะของเกม — ค่าเหล่านี้ = กำลังสู้
-    var FIGHT_SIG=[[0x1E43CE,[11,12,13]],[0x1E65A2,[11,12,5,13]]];
+    // ชุดใหม่ (26 พ.ย.): ไบต์ "สถานะของเกม" ที่นิ่งตลอดการสู้ (ยืนนิ่ง/ออกท่า/ล้ม) และไม่ซ้ำกับหน้าเมนูใดๆ — โหวต ≥80%
+    var FIGHT_SIG=[[1835228,[1]],[1835268,[1]],[1837388,[1]],[1837428,[1]],[1840032,[1]],[2040510,[103]],[2040516,[24]],[2000501,[16]],[2000509,[16]],[2000517,[24]],[2000525,[24]],[1876874,[0]],[1857147,[0,255]],[1857371,[255,0]],[1857539,[0,255]],[1861893,[0,255]]];
     var FD={state:null,score:0,total:2,busy:false,failed:false,stable:0,last:null};
-    var FIGHT_LEARNED=null; try{ var _fl=localStorage.getItem('br2_fight_sig'); if(_fl) FIGHT_LEARNED=JSON.parse(_fl); }catch(_){ }
+    var FIGHT_LEARNED=null; try{ var _fl=/[?&]ramprobe=1/.test(location.search)&&localStorage.getItem('br2_fight_sig'); if(_fl) FIGHT_LEARNED=JSON.parse(_fl); }catch(_){ }
     function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0, i;
       if(FIGHT_LEARNED&&FIGHT_LEARNED.length){ FD.total=FIGHT_LEARNED.length;
         for(i=0;i<FIGHT_LEARNED.length;i++){ if(FIGHT_LEARNED[i][1].indexOf(H[RP.base+FIGHT_LEARNED[i][0]])>=0) n++; } return n; }
