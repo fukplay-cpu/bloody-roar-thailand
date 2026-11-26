@@ -83,15 +83,21 @@ window.addEventListener('error',function(e){ L('ERROR '+(e.message||e)); });
   function setBios(b,name){ biosBlob=b; st('bios-st','✓ '+name+' ('+Math.round(b.size/1024)+' KB)'); ready(); }
   kv('bios').then(function(r){ if(r&&r.blob) setBios(r.blob,r.name+' (จำไว้จากหน้าทดสอบ 1)'); }).catch(function(){});
   $('bios-file').addEventListener('change',async function(e){ var f=e.target.files[0]; if(!f) return; var b=new Blob([await f.arrayBuffer()]); setBios(b,f.name); try{ await kv('bios',{blob:b,name:f.name}); }catch(_){ } });
+  // ไฟล์เกมที่หน้าเล่นปกติเก็บไว้ (อาจมีหลายเวอร์ชัน เช่น USA / Europe) → ให้เลือกได้ ค่าเริ่มต้น = USA
+  var found=[], cueMap={};
+  function pick(i){ var f=found[i]; if(!f) return; gameFile=f; var base=f.name.replace(/\.bin$/i,'').toLowerCase(); cueText=cueMap[base]||null;
+    st('game-st','✓ '+f.name.replace(/^br2-/,'')+' ('+(f.size/1048576).toFixed(0)+' MB)'+(cueText?' + ไฟล์ .cue ของเกมนี้':' (สร้าง .cue ให้อัตโนมัติ)')+(/europe|\(e\)|pal/i.test(f.name)?'\n⚠️ นี่คือเวอร์ชันยุโรป (50 fps) — ถ้ามีเวอร์ชัน USA ให้เลือก USA':'')); ready(); }
   (async function(){
     try{
-      var root=await navigator.storage.getDirectory(), bins=[], cues=[];
-      for await (var [name,h] of root.entries()){ if(h.kind!=='file'||name.indexOf('br2-')!==0) continue; if(/\.bin$/i.test(name)) bins.push(h); else if(/\.cue$/i.test(name)) cues.push(h); }
-      if(cues.length){ try{ cueText=await (await cues[0].getFile()).text(); }catch(_){ } }
-      if(!bins.length){ st('game-st','ไม่พบไฟล์เกมในเครื่องนี้ — เปิดเกมจากหน้าเล่นปกติ 1 ครั้งก่อน หรือเลือกไฟล์เอง',true); return; }
-      var files=await Promise.all(bins.map(function(h){ return h.getFile(); })); files.sort(function(a,b){ return b.size-a.size; });
-      gameFile=files[0]; st('game-st','✓ '+gameFile.name.replace(/^br2-/,'')+' ('+(gameFile.size/1048576).toFixed(0)+' MB)'+(cueText?' + ไฟล์ .cue ต้นฉบับ':''));
-      ready();
+      var root=await navigator.storage.getDirectory(), cues=[];
+      for await (var [name,h] of root.entries()){ if(h.kind!=='file'||name.indexOf('br2-')!==0) continue; if(/\.bin$/i.test(name)) found.push(await h.getFile()); else if(/\.cue$/i.test(name)) cues.push(h); }
+      for(var i=0;i<cues.length;i++){ try{ var cf=await cues[i].getFile(); cueMap[cf.name.replace(/\.cue$/i,'').toLowerCase()]=await cf.text(); }catch(_){ } }
+      if(!found.length){ st('game-st','ไม่พบไฟล์เกมในเครื่องนี้ — เปิดเกมจากหน้าเล่นปกติ 1 ครั้งก่อน หรือเลือกไฟล์เอง',true); return; }
+      found.sort(function(a,b){ var ua=/usa|\(u\)/i.test(a.name)?0:1, ub=/usa|\(u\)/i.test(b.name)?0:1; return ua-ub||b.size-a.size; });
+      if(found.length>1){ var sel=document.createElement('select'); sel.id='game-sel'; sel.style.cssText='display:block;margin:6px 0;max-width:100%';
+        found.forEach(function(f,i){ var o=document.createElement('option'); o.value=i; o.textContent=f.name.replace(/^br2-/,'')+' ('+(f.size/1048576).toFixed(0)+' MB)'; sel.appendChild(o); });
+        sel.onchange=function(){ pick(+sel.value); }; $('game-st').parentNode.insertBefore(sel,$('game-st')); }
+      pick(0);
     }catch(e){ st('game-st','อ่านไฟล์ที่เก็บไว้ไม่ได้ — เลือกไฟล์เอง',true); }
   })();
   $('game-file').addEventListener('change',function(e){ var f=e.target.files[0]; if(!f) return; gameFile=f; cueText=null; st('game-st','✓ '+f.name); ready(); });
