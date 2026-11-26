@@ -4061,29 +4061,40 @@ void main()
       if(RP.base<0){ rpOut('กำลังหาตำแหน่ง RAM…'); var e=await rpFindBase(); if(e){ rpOut('❌ '+e); return; } }
       var H=rpHeap(); var snap=H.slice(RP.base,RP.base+0x200000);
       (fight?RP.b:RP.a).push(snap);
-      rpOut('✅ เจอ RAM แล้ว · เก็บแล้ว: ไม่ได้สู้ '+RP.a.length+' ครั้ง · กำลังสู้ '+RP.b.length+' ครั้ง\n(เก็บแบบละอย่างน้อย 3 ครั้ง ต่างฉาก/ต่างตัวละคร แล้วกดวิเคราะห์)');
+      rpOut('✅ เจอ RAM แล้ว · เก็บแล้ว: ไม่ได้สู้ '+RP.a.length+' ครั้ง · กำลังสู้ '+RP.b.length+' ครั้ง\n(เก็บแบบละ 6–8 ครั้ง ให้ต่างกันมากที่สุด แล้วกดวิเคราะห์)');
     }
+    // วิเคราะห์: หาไบต์ที่ "ชุดค่าตอนสู้" กับ "ชุดค่าตอนไม่ได้สู้" ไม่ซ้ำกันเลยในทุกตัวอย่าง → ยิ่งตัวอย่างหลากหลาย ยิ่งแม่น
     function rpAnalyze(){
-      if(RP.a.length<2||RP.b.length<2){ rpOut('ต้องเก็บอย่างน้อยแบบละ 2 ครั้งก่อน'); return; }
-      var res=[], n=0x200000;
+      if(RP.a.length<5||RP.b.length<5){ rpOut('ต้องเก็บอย่างน้อยแบบละ 5 ครั้ง (ตอนนี้ ไม่ได้สู้ '+RP.a.length+' / กำลังสู้ '+RP.b.length+')'); return; }
+      var n=0x200000, cand=[];
       for(var i=0;i<n;i++){
-        var va=RP.a[0][i], vb=RP.b[0][i]; if(va===vb) continue; var ok=true;
-        for(var x=1;x<RP.a.length&&ok;x++) if(RP.a[x][i]!==va) ok=false;
-        for(var y=1;y<RP.b.length&&ok;y++) if(RP.b[y][i]!==vb) ok=false;
-        if(ok){ res.push(i); }
+        var A=0,B=0, x, y; // บิตมาสก์ค่า (เก็บแบบชุดเล็ก ≤ 4 ค่า)
+        var av=[], bv=[];
+        for(x=0;x<RP.a.length;x++){ var v=RP.a[x][i]; if(av.indexOf(v)<0){ av.push(v); if(av.length>4) break; } }
+        if(av.length>4) continue;
+        var bad=false;
+        for(y=0;y<RP.b.length;y++){ var w=RP.b[y][i]; if(av.indexOf(w)>=0){ bad=true; break; } if(bv.indexOf(w)<0){ bv.push(w); if(bv.length>4){ bad=true; break; } } }
+        if(bad) continue;
+        cand.push([i,bv,av.length+bv.length]);
       }
-      var hex=function(v,w){ var t=v.toString(16).toUpperCase(); while(t.length<w) t='0'+t; return t; };
-      var lines=res.slice(0,14).map(function(i){ return '80'+hex(i,6)+' : '+hex(RP.a[0][i],2)+' → '+hex(RP.b[0][i],2); });
-      rpOut('ผลวิเคราะห์ (ไม่ได้สู้ '+RP.a.length+' / กำลังสู้ '+RP.b.length+' ครั้ง)\nเจอตำแหน่งที่ใช้แยกได้ '+res.length+' จุด\n'+lines.join('\n')+(res.length>14?'\n…':'')+'\n\n📸 แคปหน้าจอนี้ส่งให้ Claude');
+      cand.sort(function(p,q){ return p[2]-q[2]; }); // ค่าน้อยแบบ = นิ่งกว่า
+      var keep=cand.slice(0,48).map(function(c){ return [c[0],c[1]]; });
+      if(!keep.length){ rpOut('ไม่เจอค่าที่แยกได้ชัด ลองเก็บตัวอย่างใหม่'); return; }
+      try{ localStorage.setItem('br2_fight_sig',JSON.stringify(keep)); }catch(_){ }
+      FIGHT_LEARNED=keep; FD.state=null; FD.last=null; FD.stable=0;
+      RP.lastSig=JSON.stringify(keep);
+      rpOut('✅ เรียนรู้แล้ว (ไม่ได้สู้ '+RP.a.length+' / กำลังสู้ '+RP.b.length+' ครั้ง)\nเจอค่าที่แยกได้ '+cand.length+' จุด · ใช้ '+keep.length+' จุดที่นิ่งที่สุด\nบันทึกในเครื่องแล้ว — ดู "สถานะตอนนี้" ด้านบนว่าถูกไหม\nแล้วกด "คัดลอกผล" ส่งให้ Claude');
+      var cp=document.getElementById('rp-copy'); if(cp) cp.style.display='';
     }
     function br2RamProbeOpen(){
       if(!RP.el){
         var d=document.createElement('section'); d.id='rp-panel';
         d.style.cssText='position:fixed;z-index:31;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);width:min(420px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:auto;box-sizing:border-box;padding:12px;background:rgba(12,12,14,.97);border:1px solid #c9a24b;border-radius:12px;color:#f4f4f4;font:13px system-ui,sans-serif';
         d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong>🧪 ทดสอบอ่าน RAM</strong><button type="button" id="rp-x">✕</button></div>'
-          +'<p style="margin:4px 0 8px;font-size:12px;color:#c4c4c4;line-height:1.5">1) อยู่หน้าที่ไม่ได้สู้ (เมนู/เลือกตัว/หน้า VS) กด “ไม่ได้สู้”<br>2) ปิดหน้าต่างนี้ เข้าไปสู้ ระหว่างสู้เปิดมากด “กำลังสู้”<br>ทำซ้ำแบบละ 3 ครั้ง ต่างฉากกัน แล้วกด “วิเคราะห์”</p>'
+          +'<p style="margin:4px 0 8px;font-size:12px;color:#c4c4c4;line-height:1.5">เก็บ<b>แบบละ 6–8 ครั้ง ให้ต่างกันมากที่สุด</b><br>• ไม่ได้สู้: หน้าแรก, เมนูหลัก, Options, เลือกตัว, หน้า VS, หน้าชนะ/แพ้, Continue<br>• กำลังสู้: คนละตัวละคร คนละฉาก, Practice, Arcade, ตอนแปลงร่าง, ตอนเลือดใกล้หมด<br>แล้วกด “วิเคราะห์”</p>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button type="button" id="rp-a">ไม่ได้สู้</button><button type="button" id="rp-b">กำลังสู้</button></div>'
           +'<button type="button" id="rp-go" style="width:100%;margin-top:6px">วิเคราะห์</button>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rp-copy" style="display:none">คัดลอกผล</button><button type="button" id="rp-reset">ล้างตัวอย่าง</button></div>'
           +'<div id="rp-live" style="margin-top:8px;font-size:12px;color:#ffd27a"></div>'
           +'<pre id="rp-out" style="white-space:pre-wrap;font:12px ui-monospace,monospace;background:#000;border:1px solid #444;border-radius:8px;padding:8px;margin:8px 0 0;min-height:3em">พร้อม</pre>';
         document.body.appendChild(d); RP.el=d;
@@ -4092,7 +4103,12 @@ void main()
         document.getElementById('rp-a').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(false).then(function(){ d.hidden=false; }); },120); };
         document.getElementById('rp-b').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(true).then(function(){ d.hidden=false; }); },120); };
         document.getElementById('rp-go').onclick=rpAnalyze;
-        setInterval(function(){ if(d.hidden) return; br2FightPoll().then(function(st){ var el=document.getElementById('rp-live'); if(el) el.textContent='สถานะตอนนี้: '+(st===null?'กำลังตรวจ…':(st?'⚔️ กำลังสู้':'— ไม่ได้สู้'))+' ('+Math.max(0,FD.score)+'/14)'; }); },400);
+        document.getElementById('rp-reset').onclick=function(){ RP.a=[]; RP.b=[]; rpOut('ล้างตัวอย่างแล้ว · เริ่มเก็บใหม่ได้'); };
+        document.getElementById('rp-copy').onclick=function(){ var t='BR2SIG '+(RP.lastSig||localStorage.getItem('br2_fight_sig')||'');
+          var done=function(){ rpOut('คัดลอกแล้ว ✅ วางส่งในแชทกับ Claude ได้เลย'); };
+          if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done,function(){ window.prompt('คัดลอกข้อความนี้',t); });
+          else window.prompt('คัดลอกข้อความนี้',t); };
+        setInterval(function(){ if(d.hidden) return; br2FightPoll().then(function(st){ var el=document.getElementById('rp-live'); if(el) el.textContent='สถานะตอนนี้: '+(st===null?'กำลังตรวจ…':(st?'⚔️ กำลังสู้':'— ไม่ได้สู้'))+' ('+Math.max(0,FD.score)+'/'+FD.total+')'+(FIGHT_LEARNED?' · ใช้ค่าที่เรียนรู้':''); }); },400);
       }
       RP.el.hidden=false;
     }
@@ -4103,14 +4119,18 @@ void main()
     var FIGHT_SIG=[[0x04E8A5,0x00,0xFF],[0x04F89F,0x01,0x00],[0x05ABAF,0x01,0x00],[0x070311,0x01,0x00],[0x073A7F,0x01,0x00],
       [0x0B5FA5,0x00,0x01],[0x0B9D31,0x00,0x01],[0x0BA101,0x00,0x01],[0x0BDF01,0x00,0x01],[0x0BDFD1,0x00,0x01],
       [0x0BE02D,0x00,0x01],[0x0C21D9,0x00,0x01],[0x1D22EA,0x1D,0x00],[0x1D3DD5,0x00,0x80]];
-    var FD={state:null,score:0,busy:false,failed:false,stable:0,last:null};
-    function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0;
-      for(var i=0;i<FIGHT_SIG.length;i++){ if(H[RP.base+FIGHT_SIG[i][0]]===FIGHT_SIG[i][2]) n++; } return n; }
+    var FD={state:null,score:0,total:14,busy:false,failed:false,stable:0,last:null};
+    var FIGHT_LEARNED=null; try{ var _fl=localStorage.getItem('br2_fight_sig'); if(_fl) FIGHT_LEARNED=JSON.parse(_fl); }catch(_){ }
+    function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0, i;
+      if(FIGHT_LEARNED&&FIGHT_LEARNED.length){ FD.total=FIGHT_LEARNED.length;
+        for(i=0;i<FIGHT_LEARNED.length;i++){ if(FIGHT_LEARNED[i][1].indexOf(H[RP.base+FIGHT_LEARNED[i][0]])>=0) n++; } return n; }
+      FD.total=FIGHT_SIG.length;
+      for(i=0;i<FIGHT_SIG.length;i++){ if(H[RP.base+FIGHT_SIG[i][0]]===FIGHT_SIG[i][2]) n++; } return n; }
     async function br2FightPoll(){
       if(!ng||FD.busy||FD.failed) return FD.state;
       if(RP.base<0){ if(!window.__br2FrameInfo||!window.__br2FrameInfo().alive) return null; FD.busy=true;
         var e=await rpFindBase(); FD.busy=false; if(e){ FD.failed=true; try{ log('ตรวจสถานะการสู้ไม่ได้: '+e,'err'); }catch(_){ } return null; } }
-      var sc=br2FightScore(); FD.score=sc; var now=sc>=11;
+      var sc=br2FightScore(); FD.score=sc; var now=sc>=Math.ceil(FD.total*0.8);
       if(now===FD.last) FD.stable++; else { FD.last=now; FD.stable=1; }
       if(FD.stable>=2&&FD.state!==now){ FD.state=now; } // ต้องตรงกัน 2 ครั้งติด กันกระพริบ
       return FD.state;
