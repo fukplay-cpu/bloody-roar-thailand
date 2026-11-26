@@ -4914,9 +4914,9 @@ void main()
         document.getElementById('rp-go').onclick=rpAnalyze;
         document.getElementById('rp-rec').onclick=function(){ var b=this;
           if(RP.recT){ clearInterval(RP.recT); RP.recT=null; b.textContent='⏺ บันทึกค่า'; rpOut('หยุดบันทึกแล้ว · '+(RP.rec||[]).length+' รายการ · กด "คัดลอกบันทึก"'); return; }
-          RP.rec=[]; RP.rec0=Date.now(); var last='';
-          RP.recT=setInterval(function(){ var H=rpHeap(); if(!H||RP.base<0) return; var v=H[RP.base+0x1E43CE]+','+H[RP.base+0x1E65A2];
-            if(v!==last){ last=v; RP.rec.push(((Date.now()-RP.rec0)/1000).toFixed(1)+':'+v); if(RP.rec.length>400) RP.rec.shift(); } },100);
+          RP.rec=[]; RP.rec0=Date.now(); var last=''; FIGHT_LEARNED=null; try{ localStorage.removeItem('br2_fight_sig'); }catch(_){ }
+          RP.recT=setInterval(function(){ var H=rpHeap(); if(!H||RP.base<0) return; br2FightPoll(); var v=br2SigBits(H,FIGHT_SIG)+'|'+br2SigBits(H,FIGHT_SIG2)+'|'+(FD.state?'F':'-');
+            if(v!==last){ last=v; RP.rec.push(((Date.now()-RP.rec0)/1000).toFixed(1)+':'+v); if(RP.rec.length>1500) RP.rec.shift(); } },100);
           b.textContent='⏹ หยุดบันทึก'; d.hidden=true; };
         document.getElementById('rp-reccopy').onclick=function(){ var t='BR2LOG '+(RP.rec||[]).join(' ');
           if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ rpOut('คัดลอกแล้ว ✅ วางส่งให้ Claude'); },function(){ window.prompt('คัดลอกข้อความนี้',t); }); else window.prompt('คัดลอกข้อความนี้',t); };
@@ -4936,13 +4936,19 @@ void main()
     // 14 ตำแหน่งที่ค่าต่างกันชัดเจนระหว่างตอนสู้/ไม่ได้สู้ → ให้โหวตรวมกัน (ตรงค่าตอนสู้ ≥ 11 จุด = กำลังสู้)
     // ค่าที่เรียนรู้จากการทดสอบบน iPhone (เกม USA): 2 ไบต์ที่เป็นสถานะของเกม — ค่าเหล่านี้ = กำลังสู้
     var FIGHT_SIG=[[0x1E43CE,[11,12,13]],[0x1E65A2,[11,12,5,13]]];
+    // ชุดที่ 2 (26 พ.ย.): ไบต์สถานะเกม 16 จุด — ใช้ร่วมกับชุดแรก (ชุดไหนตรงก็นับว่ากำลังสู้)
+    var FIGHT_SIG2=[[1835228,[1]],[1835268,[1]],[1837388,[1]],[1837428,[1]],[1840032,[1]],[2040510,[103]],[2040516,[24]],[2000501,[16]],[2000509,[16]],[2000517,[24]],[2000525,[24]],[1876874,[0]],[1857147,[0,255]],[1857371,[255,0]],[1857539,[0,255]],[1861893,[0,255]]];
+    function br2SigBits(H,sig){ var t=''; for(var i=0;i<sig.length;i++) t+=sig[i][1].indexOf(H[RP.base+sig[i][0]])>=0?'1':'0'; return t; }
     var FD={state:null,score:0,total:2,busy:false,failed:false,stable:0,last:null};
     var FIGHT_LEARNED=null; try{ var _fl=/[?&]ramprobe=1/.test(location.search)&&localStorage.getItem('br2_fight_sig'); if(_fl) FIGHT_LEARNED=JSON.parse(_fl); }catch(_){ }
     function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0, i;
       if(FIGHT_LEARNED&&FIGHT_LEARNED.length){ FD.total=FIGHT_LEARNED.length;
         for(i=0;i<FIGHT_LEARNED.length;i++){ if(FIGHT_LEARNED[i][1].indexOf(H[RP.base+FIGHT_LEARNED[i][0]])>=0) n++; } return n; }
       FD.total=FIGHT_SIG.length;
-      for(i=0;i<FIGHT_SIG.length;i++){ if(FIGHT_SIG[i][1].indexOf(H[RP.base+FIGHT_SIG[i][0]])>=0) n++; } return n; }
+      for(i=0;i<FIGHT_SIG.length;i++){ if(FIGHT_SIG[i][1].indexOf(H[RP.base+FIGHT_SIG[i][0]])>=0) n++; }
+      var m=0; for(i=0;i<FIGHT_SIG2.length;i++){ if(FIGHT_SIG2[i][1].indexOf(H[RP.base+FIGHT_SIG2[i][0]])>=0) m++; }
+      FD.score2=m; if(m>=10) n=FD.total; // ชุดที่ 2 ตรง ≥10/16 → นับว่ากำลังสู้
+      return n; }
     async function br2FightPoll(){
       if(!ng||FD.busy) return FD.state;
       if(RP.base<0){
