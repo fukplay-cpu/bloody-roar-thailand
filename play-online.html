@@ -4946,8 +4946,11 @@ void main()
         FD.failed=false; try{ log('พร้อมตรวจสถานะการสู้แล้ว','ok'); }catch(_){ }
       }
       var sc=br2FightScore(); FD.score=sc; var now=sc>=Math.ceil(FD.total*0.8);
-      if(now===FD.last) FD.stable++; else { FD.last=now; FD.stable=1; }
-      if(FD.stable>=2&&FD.state!==now){ FD.state=now; } // ต้องตรงกัน 2 ครั้งติด กันกระพริบ
+      if(now===FD.last) FD.stable++; else { FD.last=now; FD.stable=1; FD.since=Date.now(); }
+      // เข้าโหมดสู้: ตรงกัน 2 ครั้งติด · ออกจากโหมดสู้: ต้องไม่ใช่ค่าตอนสู้ต่อเนื่อง 3 วินาที
+      // (ระหว่างสู้ เกมสลับสถานะย่อยชั่วคราว เช่น ตอนล้ม/โดนคอมโบ/แปลงร่าง → ไม่ให้ป้ายกระพริบ)
+      if(now&&FD.stable>=2&&FD.state!==true){ FD.state=true; }
+      else if(!now&&FD.state!==false&&(FD.state===null?FD.stable>=2:Date.now()-FD.since>=3000)){ FD.state=false; }
       return FD.state;
     }
     window.__br2Fight=function(){ return {state:FD.state,score:FD.score,failed:FD.failed,ready:RP.base>=0}; };
