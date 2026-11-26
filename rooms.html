@@ -349,7 +349,7 @@ footer {
 🔒 รอผู้เล่นครบ 2 คน
 </button>
 
-<label class="start-info" style="display:flex;gap:8px;align-items:center;justify-content:center;cursor:pointer">
+<label class="start-info" hidden style="display:none">
 <input type="checkbox" id="streamMode" checked>
 📺 โหมดส่งภาพ (แนะนำ) — เครื่อง P1 รันเกมแล้วส่งภาพให้ P2 · ภาพตรงกันเสมอ · P2 ไม่ต้องโหลดเกม
 </label>
@@ -397,8 +397,7 @@ let busy = false;
 window.addEventListener("DOMContentLoaded", () => {
   const box = document.getElementById("streamMode");
   if (!box) return;
-  try { const v = localStorage.getItem("br2_stream_mode"); if (v !== null) box.checked = v === "1"; } catch (_) {}
-  box.addEventListener("change", () => { try { localStorage.setItem("br2_stream_mode", box.checked ? "1" : "0"); } catch (_) {} });
+  box.checked = true;
 });
 let gameStarted = false;
 let launchTimer = null;
@@ -617,9 +616,30 @@ function showRoomCode(code) {
    WEBSOCKET
 ================================= */
 
+/* ต่อห้องใหม่อัตโนมัติ: มือถือพับจอแล้ว iOS ตัดการเชื่อมต่อ → กลับมาแล้วต่อห้องเดิม (ที่นั่งยังอยู่) */
+let roomRole = "";
+let reconnectTimer = null;
+let reconnectTries = 0;
+function scheduleReconnect(delay) {
+  clearTimeout(reconnectTimer);
+  if (!activeRoomCode || !activePlayerId || gameStarted) return;
+  reconnectTimer = setTimeout(() => {
+    if (!activeRoomCode || !activePlayerId || gameStarted) return;
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    reconnectTries++;
+    connectRoom(activeRoomCode, activePlayerId, roomRole || "host");
+  }, delay);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") { reconnectTries = 0; scheduleReconnect(0); }
+});
+window.addEventListener("pageshow", () => { reconnectTries = 0; scheduleReconnect(0); });
+window.addEventListener("online", () => { reconnectTries = 0; scheduleReconnect(0); });
+
 function connectRoom(code,playerId,role) {
 
   closeSocket();
+  roomRole = role;
 
   const wsURL = new URL(
   API.replace(/^https:/,"wss:") +
@@ -637,6 +657,7 @@ const ws = new WebSocket(wsURL.toString());
   ws.onopen = () => {
 
     if (socket !== ws) return;
+    reconnectTries = 0;
 
     status(
       "เชื่อมต่อห้องสำเร็จ\n" +
@@ -746,7 +767,11 @@ const ws = new WebSocket(wsURL.toString());
 
     socket = null;
 
-    if (!gameStarted) {
+    if (!gameStarted && activeRoomCode) {
+      status("กำลังต่อห้องใหม่... (รหัสห้อง " + activeRoomCode + ")");
+      // หน้าจอเปิดอยู่: ลองใหม่เรื่อยๆ (1, 2, 4… สูงสุด 10 วินาที) · พับจออยู่: รอกลับมาค่อยต่อ
+      if (document.visibilityState === "visible") scheduleReconnect(Math.min(10000, 1000 * Math.pow(2, Math.min(reconnectTries, 4))));
+    } else if (!gameStarted) {
       status("การเชื่อมต่อห้องสิ้นสุดแล้ว");
     }
   };
@@ -948,8 +973,8 @@ function launchFix6() {
     "1"
   );
 
-  // โหมดส่งภาพ: ทั้งสองเครื่องต้องเลือกเหมือนกัน (ค่าเริ่มต้น = ส่งภาพ)
-  if ($("streamMode") && $("streamMode").checked) {
+  // ใช้โหมดส่งภาพเสมอ (เสถียรที่สุด)
+  {
     gameURL.searchParams.set("mode", "stream");
     const idx = lastPlayers.findIndex(p => p && p.id === activePlayerId);
     if (idx >= 0) gameURL.searchParams.set("role", String(idx + 1));
@@ -1006,6 +1031,7 @@ function closeSocket() {
 async function disconnectRoom() {
 
   clearTimeout(launchTimer);
+  clearTimeout(reconnectTimer);
 
   const code = activeRoomCode;
   const playerId = activePlayerId;
