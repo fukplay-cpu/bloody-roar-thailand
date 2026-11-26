@@ -335,6 +335,7 @@
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
       if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='sa'){ stPeerAway(!!d.a, d.p); return true; }
+      if(d.t==='sf'){ if(stRole()===2){ ST.peerFight=(d.f===1||d.f===2); ntPlace(); } return true; }
       if(d.t==='rdy'||d.t==='i'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดล็อกเฟรม"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return true; }
       return false;
     }
@@ -455,7 +456,7 @@
     }
     function ntPlace(){
       if(!NT.box) ntMake(); if(!NT.box) return;
-      var g=ntGameRect(); if(!NT.on||!g){ NT.box.style.display='none'; return; }
+      var g=ntGameRect(); if(!NT.on||!g||!ntFighting()){ NT.box.style.display='none'; ntMenuLabel(); return; }
       NT.box.style.display='';
       var fs=Math.max(10,Math.round(g.height*0.034)), cy=g.top+g.height*0.192;
       [[NT.el1,0.17],[NT.el2,0.83]].forEach(function(x,i){ var el=x[0];
@@ -474,7 +475,20 @@
       b.addEventListener('click',function(e){ e.stopPropagation(); NT.on=!NT.on; try{ localStorage.setItem('br2_name_tags',NT.on?'1':'0'); }catch(_){ } ntPlace(); ntMenuLabel(); });
       ref.parentNode.insertBefore(b,ref.nextSibling); ntMenuLabel();
     }
-    function ntStart(){ ntMenuButton(); ntPlace(); setInterval(ntPlace,500); window.addEventListener('resize',function(){ setTimeout(ntPlace,50); }); }
+    // แสดงเฉพาะตอนกำลังสู้: P1 อ่านจาก RAM ของเกม แล้วส่งสถานะให้ P2 · ถ้าอ่านไม่ได้ แสดงตลอด (แบบเดิม)
+    function ntFighting(){
+      if(window.__br2Viewer){ return ST.peerFight===undefined?false:!!ST.peerFight; }
+      var f=window.__br2Fight&&window.__br2Fight(); if(!f||f.failed) return true;
+      return f.state===true;
+    }
+    function ntFightTick(){
+      if(window.__br2Viewer||typeof window.__br2FightPoll!=='function') return;
+      window.__br2FightPoll().then(function(st){
+        var f=window.__br2Fight(); var v=f.failed?2:(st?1:0);
+        if(v!==ST.sentFight||Date.now()-(ST.sentFightAt||0)>3000){ ST.sentFight=v; ST.sentFightAt=Date.now(); try{ lsSendRaw({t:'sf',f:v}); }catch(_){ } }
+      });
+    }
+    function ntStart(){ ntMenuButton(); ntPlace(); setInterval(function(){ ntFightTick(); ntPlace(); },300); window.addEventListener('resize',function(){ setTimeout(ntPlace,50); }); }
     ST.ntPlace=ntPlace; // ใช้ทดสอบ
 
     function stStart(){
