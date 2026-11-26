@@ -4264,6 +4264,7 @@ try {
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
       if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='sa'){ stPeerAway(!!d.a, d.p); return true; }
+      if(d.t==='sf'){ if(stRole()===2){ ST.peerFight=(d.f===1||d.f===2); ntPlace(); } return true; }
       if(d.t==='rdy'||d.t==='i'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดล็อกเฟรม"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return true; }
       return false;
     }
@@ -4351,11 +4352,80 @@ try {
     }
     document.addEventListener('visibilitychange',function(){ if(!ST.on) return; if(document.hidden) stOnHidden(); else stOnVisible(); });
     window.addEventListener('pagehide',function(){ if(!ST.on) return; stOnHidden(); stClosePc(); });
+    // ===== ป้ายชื่อผู้เล่นบนจอเกม (วางซ้อนบนหน้าเว็บ ไม่ได้แก้ตัวเกม) =====
+    // ตำแหน่งเทียบกับภาพเกม: แถวเดียวกับชื่อตัวละครในเกม (สูงราว 19% ของภาพ) ถัดเข้ามาทางกลางจอ
+    var NT={on:true,el1:null,el2:null,box:null};
+    try{ NT.on=localStorage.getItem('br2_name_tags')!=='0'; }catch(_){ }
+    function ntNames(){ var q; try{ q=new URLSearchParams(location.search); }catch(_){ q=null; }
+      var n1=(q&&q.get('n1')||'').trim().slice(0,20), n2=(q&&q.get('n2')||'').trim().slice(0,20);
+      return [n1||'Player 1', n2||'Player 2']; }
+    function ntGameRect(){
+      var stage=document.getElementById('stage'); if(!stage) return null;
+      var el=window.__br2Viewer?ST.video:document.querySelector('#stage canvas'); if(!el) return null;
+      var r=el.getBoundingClientRect(); if(!r.width||!r.height) return null;
+      if(window.__br2Viewer&&el.videoWidth&&el.style.objectFit!=='fill'){ // วิดีโอแบบ contain: หาพื้นที่ภาพจริง
+        var va=el.videoWidth/el.videoHeight, ra=r.width/r.height, w=r.width, h=r.height;
+        if(ra>va){ w=h*va; } else { h=w/va; }
+        r={left:r.left+(r.width-w)/2, top:r.top+(r.height-h)/2, width:w, height:h};
+      }
+      var sr=stage.getBoundingClientRect();
+      return {left:r.left-sr.left, top:r.top-sr.top, width:r.width, height:r.height};
+    }
+    function ntMake(){
+      if(NT.box) return; var stage=document.getElementById('stage'); if(!stage) return;
+      var box=document.createElement('div'); box.id='br2-name-tags';
+      box.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:2';
+      var mk=function(c,b){ var d=document.createElement('div');
+        d.style.cssText='position:absolute;font-weight:600;font-family:system-ui,sans-serif;padding:.1em .5em;border-radius:.35em;background:rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;color:'+c+';border:1px solid '+b;
+        box.appendChild(d); return d; };
+      NT.el1=mk('#ffd27a','rgba(201,162,75,.85)'); NT.el2=mk('#9fd3ff','rgba(96,165,250,.85)');
+      var n=ntNames(); NT.el1.textContent=n[0]; NT.el2.textContent=n[1];
+      var pad=document.getElementById('pad'); if(pad&&pad.parentNode===stage) stage.insertBefore(box,pad); else stage.appendChild(box);
+      NT.box=box;
+    }
+    function ntPlace(){
+      if(!NT.box) ntMake(); if(!NT.box) return;
+      var g=ntGameRect(); if(!NT.on||!g||!ntFighting()){ NT.box.style.display='none'; ntMenuLabel(); return; }
+      NT.box.style.display='';
+      var fs=Math.max(10,Math.round(g.height*0.034)), cy=g.top+g.height*0.192;
+      [[NT.el1,0.17],[NT.el2,0.83]].forEach(function(x,i){ var el=x[0];
+        el.style.fontSize=fs+'px'; el.style.maxWidth=Math.round(g.width*0.18)+'px';
+        el.style.top=Math.round(cy-fs*0.7)+'px';
+        if(i===0){ el.style.left=Math.round(g.left+g.width*x[1])+'px'; el.style.right=''; }
+        else { el.style.left=''; var st=document.getElementById('stage'); var W=st?st.getBoundingClientRect().width:innerWidth; el.style.right=Math.round(W-(g.left+g.width*x[1]))+'px'; }
+      });
+      ntMenuLabel();
+    }
+    function ntMenuLabel(){ var b=document.getElementById('btn-name-tags'); if(b) b.textContent=NT.on?'ป้ายชื่อ: เปิด':'ป้ายชื่อ: ปิด'; }
+    function ntMenuButton(){
+      if(document.getElementById('btn-name-tags')) return;
+      var ref=document.getElementById('btn-aspect'); if(!ref||!ref.parentNode) return;
+      var b=document.createElement('button'); b.type='button'; b.id='btn-name-tags'; b.title='แสดง/ซ่อนชื่อผู้เล่นบนจอเกม';
+      b.addEventListener('click',function(e){ e.stopPropagation(); NT.on=!NT.on; try{ localStorage.setItem('br2_name_tags',NT.on?'1':'0'); }catch(_){ } ntPlace(); ntMenuLabel(); });
+      ref.parentNode.insertBefore(b,ref.nextSibling); ntMenuLabel();
+    }
+    // แสดงเฉพาะตอนกำลังสู้: P1 อ่านจาก RAM ของเกม แล้วส่งสถานะให้ P2 · ถ้าอ่านไม่ได้ แสดงตลอด (แบบเดิม)
+    function ntFighting(){
+      if(window.__br2Viewer){ return ST.peerFight===undefined?false:!!ST.peerFight; }
+      var f=window.__br2Fight&&window.__br2Fight(); if(!f||f.failed) return true;
+      return f.state===true;
+    }
+    function ntFightTick(){
+      if(window.__br2Viewer||typeof window.__br2FightPoll!=='function') return;
+      window.__br2FightPoll().then(function(st){
+        var f=window.__br2Fight(); var v=f.failed?2:(st?1:0);
+        if(v!==ST.sentFight||Date.now()-(ST.sentFightAt||0)>3000){ ST.sentFight=v; ST.sentFightAt=Date.now(); try{ lsSendRaw({t:'sf',f:v}); }catch(_){ } }
+      });
+    }
+    function ntStart(){ ntMenuButton(); ntPlace(); setInterval(function(){ ntFightTick(); ntPlace(); },300); window.addEventListener('resize',function(){ setTimeout(ntPlace,50); }); }
+    ST.ntPlace=ntPlace; // ใช้ทดสอบ
+
     function stStart(){
       stLog('เริ่มโหมดส่งภาพ (P'+(ST.hint||'?')+')','ok');
       if(window.__br2Viewer) setTimeout(stViewerUi,0); // หลังสคริปต์ทั้งหน้าทำงานครบ (ไม่งั้นตัวแปรของ D-pad ถูกรีเซ็ต)
       setInterval(function(){ stStats(); lsShow(); },1000);
       stLoadTurn(); stHelloSoon(800);
+      setTimeout(ntStart,0);
     }
     br2ConnectFromUrl();
     var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
@@ -4816,6 +4886,7 @@ void main()
           +'<p style="margin:4px 0 8px;font-size:12px;color:#c4c4c4;line-height:1.5">1) อยู่หน้าที่ไม่ได้สู้ (เมนู/เลือกตัว/หน้า VS) กด “ไม่ได้สู้”<br>2) ปิดหน้าต่างนี้ เข้าไปสู้ ระหว่างสู้เปิดมากด “กำลังสู้”<br>ทำซ้ำแบบละ 3 ครั้ง ต่างฉากกัน แล้วกด “วิเคราะห์”</p>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button type="button" id="rp-a">ไม่ได้สู้</button><button type="button" id="rp-b">กำลังสู้</button></div>'
           +'<button type="button" id="rp-go" style="width:100%;margin-top:6px">วิเคราะห์</button>'
+          +'<div id="rp-live" style="margin-top:8px;font-size:12px;color:#ffd27a"></div>'
           +'<pre id="rp-out" style="white-space:pre-wrap;font:12px ui-monospace,monospace;background:#000;border:1px solid #444;border-radius:8px;padding:8px;margin:8px 0 0;min-height:3em">พร้อม</pre>';
         document.body.appendChild(d); RP.el=d;
         d.querySelectorAll('button').forEach(function(b){ b.style.cssText+='background:#242428;color:#fff;border:1px solid #777;border-radius:8px;padding:8px 10px;font:inherit'; });
@@ -4823,10 +4894,31 @@ void main()
         document.getElementById('rp-a').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(false).then(function(){ d.hidden=false; }); },120); };
         document.getElementById('rp-b').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(true).then(function(){ d.hidden=false; }); },120); };
         document.getElementById('rp-go').onclick=rpAnalyze;
+        setInterval(function(){ if(d.hidden) return; br2FightPoll().then(function(st){ var el=document.getElementById('rp-live'); if(el) el.textContent='สถานะตอนนี้: '+(st===null?'กำลังตรวจ…':(st?'⚔️ กำลังสู้':'— ไม่ได้สู้'))+' ('+Math.max(0,FD.score)+'/14)'; }); },400);
       }
       RP.el.hidden=false;
     }
     window.__br2RamProbe={RP:RP,heap:rpHeap,findBase:rpFindBase};
+
+    // ===== ตรวจว่า "กำลังสู้" จาก RAM ของเกม (เวอร์ชัน USA) — ได้จากการทดสอบบน iPhone =====
+    // 14 ตำแหน่งที่ค่าต่างกันชัดเจนระหว่างตอนสู้/ไม่ได้สู้ → ให้โหวตรวมกัน (ตรงค่าตอนสู้ ≥ 11 จุด = กำลังสู้)
+    var FIGHT_SIG=[[0x04E8A5,0x00,0xFF],[0x04F89F,0x01,0x00],[0x05ABAF,0x01,0x00],[0x070311,0x01,0x00],[0x073A7F,0x01,0x00],
+      [0x0B5FA5,0x00,0x01],[0x0B9D31,0x00,0x01],[0x0BA101,0x00,0x01],[0x0BDF01,0x00,0x01],[0x0BDFD1,0x00,0x01],
+      [0x0BE02D,0x00,0x01],[0x0C21D9,0x00,0x01],[0x1D22EA,0x1D,0x00],[0x1D3DD5,0x00,0x80]];
+    var FD={state:null,score:0,busy:false,failed:false,stable:0,last:null};
+    function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0;
+      for(var i=0;i<FIGHT_SIG.length;i++){ if(H[RP.base+FIGHT_SIG[i][0]]===FIGHT_SIG[i][2]) n++; } return n; }
+    async function br2FightPoll(){
+      if(!ng||FD.busy||FD.failed) return FD.state;
+      if(RP.base<0){ if(!window.__br2FrameInfo||!window.__br2FrameInfo().alive) return null; FD.busy=true;
+        var e=await rpFindBase(); FD.busy=false; if(e){ FD.failed=true; try{ log('ตรวจสถานะการสู้ไม่ได้: '+e,'err'); }catch(_){ } return null; } }
+      var sc=br2FightScore(); FD.score=sc; var now=sc>=11;
+      if(now===FD.last) FD.stable++; else { FD.last=now; FD.stable=1; }
+      if(FD.stable>=2&&FD.state!==now){ FD.state=now; } // ต้องตรงกัน 2 ครั้งติด กันกระพริบ
+      return FD.state;
+    }
+    window.__br2Fight=function(){ return {state:FD.state,score:FD.score,failed:FD.failed,ready:RP.base>=0}; };
+    window.__br2FightPoll=br2FightPoll;
 
     // ===== ตัวนับเฟรมของเกม: ตัวเกมอ่านจอยผ่าน navigator.getGamepads() ครั้งเดียวต่อ 1 เฟรม (บนเธรดหลัก) =====
     var br2Frame=0, br2FrameT=0, br2FrameHooks=[], br2FramePending=false;
