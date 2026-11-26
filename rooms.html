@@ -977,6 +977,9 @@ function launchFix6() {
   {
     gameURL.searchParams.set("mode", "stream");
     const idx = lastPlayers.findIndex(p => p && p.id === activePlayerId);
+    // ชื่อผู้เล่นสำหรับป้ายชื่อบนจอเกม (คนสร้างห้อง = P1)
+    if (lastPlayers[0] && lastPlayers[0].name) gameURL.searchParams.set("n1", String(lastPlayers[0].name).slice(0, 20));
+    if (lastPlayers[1] && lastPlayers[1].name) gameURL.searchParams.set("n2", String(lastPlayers[1].name).slice(0, 20));
     if (idx >= 0) gameURL.searchParams.set("role", String(idx + 1));
   }
 

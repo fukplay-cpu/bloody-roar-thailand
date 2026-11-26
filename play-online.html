@@ -4350,11 +4350,67 @@ try {
     }
     document.addEventListener('visibilitychange',function(){ if(!ST.on) return; if(document.hidden) stOnHidden(); else stOnVisible(); });
     window.addEventListener('pagehide',function(){ if(!ST.on) return; stOnHidden(); stClosePc(); });
+    // ===== ป้ายชื่อผู้เล่นบนจอเกม (วางซ้อนบนหน้าเว็บ ไม่ได้แก้ตัวเกม) =====
+    // ตำแหน่งเทียบกับภาพเกม: แถวเดียวกับชื่อตัวละครในเกม (สูงราว 19% ของภาพ) ถัดเข้ามาทางกลางจอ
+    var NT={on:true,el1:null,el2:null,box:null};
+    try{ NT.on=localStorage.getItem('br2_name_tags')!=='0'; }catch(_){ }
+    function ntNames(){ var q; try{ q=new URLSearchParams(location.search); }catch(_){ q=null; }
+      var n1=(q&&q.get('n1')||'').trim().slice(0,20), n2=(q&&q.get('n2')||'').trim().slice(0,20);
+      return [n1||'Player 1', n2||'Player 2']; }
+    function ntGameRect(){
+      var stage=document.getElementById('stage'); if(!stage) return null;
+      var el=window.__br2Viewer?ST.video:document.querySelector('#stage canvas'); if(!el) return null;
+      var r=el.getBoundingClientRect(); if(!r.width||!r.height) return null;
+      if(window.__br2Viewer&&el.videoWidth&&el.style.objectFit!=='fill'){ // วิดีโอแบบ contain: หาพื้นที่ภาพจริง
+        var va=el.videoWidth/el.videoHeight, ra=r.width/r.height, w=r.width, h=r.height;
+        if(ra>va){ w=h*va; } else { h=w/va; }
+        r={left:r.left+(r.width-w)/2, top:r.top+(r.height-h)/2, width:w, height:h};
+      }
+      var sr=stage.getBoundingClientRect();
+      return {left:r.left-sr.left, top:r.top-sr.top, width:r.width, height:r.height};
+    }
+    function ntMake(){
+      if(NT.box) return; var stage=document.getElementById('stage'); if(!stage) return;
+      var box=document.createElement('div'); box.id='br2-name-tags';
+      box.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:2';
+      var mk=function(c,b){ var d=document.createElement('div');
+        d.style.cssText='position:absolute;font-weight:600;font-family:system-ui,sans-serif;padding:.1em .5em;border-radius:.35em;background:rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;color:'+c+';border:1px solid '+b;
+        box.appendChild(d); return d; };
+      NT.el1=mk('#ffd27a','rgba(201,162,75,.85)'); NT.el2=mk('#9fd3ff','rgba(96,165,250,.85)');
+      var n=ntNames(); NT.el1.textContent=n[0]; NT.el2.textContent=n[1];
+      var pad=document.getElementById('pad'); if(pad&&pad.parentNode===stage) stage.insertBefore(box,pad); else stage.appendChild(box);
+      NT.box=box;
+    }
+    function ntPlace(){
+      if(!NT.box) ntMake(); if(!NT.box) return;
+      var g=ntGameRect(); if(!NT.on||!g){ NT.box.style.display='none'; return; }
+      NT.box.style.display='';
+      var fs=Math.max(10,Math.round(g.height*0.034)), cy=g.top+g.height*0.192;
+      [[NT.el1,0.17],[NT.el2,0.83]].forEach(function(x,i){ var el=x[0];
+        el.style.fontSize=fs+'px'; el.style.maxWidth=Math.round(g.width*0.18)+'px';
+        el.style.top=Math.round(cy-fs*0.7)+'px';
+        if(i===0){ el.style.left=Math.round(g.left+g.width*x[1])+'px'; el.style.right=''; }
+        else { el.style.left=''; var st=document.getElementById('stage'); var W=st?st.getBoundingClientRect().width:innerWidth; el.style.right=Math.round(W-(g.left+g.width*x[1]))+'px'; }
+      });
+      ntMenuLabel();
+    }
+    function ntMenuLabel(){ var b=document.getElementById('btn-name-tags'); if(b) b.textContent=NT.on?'ป้ายชื่อ: เปิด':'ป้ายชื่อ: ปิด'; }
+    function ntMenuButton(){
+      if(document.getElementById('btn-name-tags')) return;
+      var ref=document.getElementById('btn-aspect'); if(!ref||!ref.parentNode) return;
+      var b=document.createElement('button'); b.type='button'; b.id='btn-name-tags'; b.title='แสดง/ซ่อนชื่อผู้เล่นบนจอเกม';
+      b.addEventListener('click',function(e){ e.stopPropagation(); NT.on=!NT.on; try{ localStorage.setItem('br2_name_tags',NT.on?'1':'0'); }catch(_){ } ntPlace(); ntMenuLabel(); });
+      ref.parentNode.insertBefore(b,ref.nextSibling); ntMenuLabel();
+    }
+    function ntStart(){ ntMenuButton(); ntPlace(); setInterval(ntPlace,500); window.addEventListener('resize',function(){ setTimeout(ntPlace,50); }); }
+    ST.ntPlace=ntPlace; // ใช้ทดสอบ
+
     function stStart(){
       stLog('เริ่มโหมดส่งภาพ (P'+(ST.hint||'?')+')','ok');
       if(window.__br2Viewer) setTimeout(stViewerUi,0); // หลังสคริปต์ทั้งหน้าทำงานครบ (ไม่งั้นตัวแปรของ D-pad ถูกรีเซ็ต)
       setInterval(function(){ stStats(); lsShow(); },1000);
       stLoadTurn(); stHelloSoon(800);
+      setTimeout(ntStart,0);
     }
     br2ConnectFromUrl();
     var discs=[], curDiscIndex=0, isMulti=false;   // multi-disque (FF7=3 CD) : m3u paresseux, 1 CHD en RAM à la fois
