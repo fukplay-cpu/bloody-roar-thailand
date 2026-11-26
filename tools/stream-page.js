@@ -335,7 +335,8 @@
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
       if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='sa'){ stPeerAway(!!d.a, d.p); return true; }
-      if(d.t==='sf'){ if(stRole()===2){ ST.peerFight=(d.f===1||d.f===2); ntPlace(); } return true; }
+      if(d.t==='sf'){ if(stRole()===2){ ST.peerFight=(d.f===1); ntPlace(); } return true; }
+      if(d.t==='nm'){ ntSetName(d.p, d.n); return true; }
       if(d.t==='rdy'||d.t==='i'){ LS.error='⚠️ อีกเครื่องเลือก "โหมดล็อกเฟรม"\nทั้งสองเครื่องต้องเลือกโหมดเดียวกันในหน้าห้อง'; lsShow(); return true; }
       return false;
     }
@@ -429,7 +430,12 @@
     try{ NT.on=localStorage.getItem('br2_name_tags')!=='0'; }catch(_){ }
     function ntNames(){ var q; try{ q=new URLSearchParams(location.search); }catch(_){ q=null; }
       var n1=(q&&q.get('n1')||'').trim().slice(0,20), n2=(q&&q.get('n2')||'').trim().slice(0,20);
-      return [n1||'Player 1', n2||'Player 2']; }
+      var me=(q&&q.get('me')||'').trim().slice(0,20);
+      if(me){ if(stRole()===1) n1=me; else if(stRole()===2) n2=me; }
+      NT.me=me; return [n1||'Player 1', n2||'Player 2']; }
+    function ntSetName(p,n){ n=String(n||'').trim().slice(0,20); if(!n||(p!==1&&p!==2)) return;
+      if(!NT.box) ntMake(); var el=p===1?NT.el1:NT.el2; if(el&&el.textContent!==n){ el.textContent=n; } }
+    function ntSendName(){ if(!NT.me) return; try{ lsSendRaw({t:'nm',p:stRole(),n:NT.me}); }catch(_){ } }
     function ntGameRect(){
       var stage=document.getElementById('stage'); if(!stage) return null;
       var el=window.__br2Viewer?ST.video:document.querySelector('#stage canvas'); if(!el) return null;
@@ -476,19 +482,19 @@
       ref.parentNode.insertBefore(b,ref.nextSibling); ntMenuLabel();
     }
     // แสดงเฉพาะตอนกำลังสู้: P1 อ่านจาก RAM ของเกม แล้วส่งสถานะให้ P2 · ถ้าอ่านไม่ได้ แสดงตลอด (แบบเดิม)
+    // ยังไม่รู้สถานะ = ซ่อนไว้ก่อน (ไม่ขึ้นค้างตอนโหลดเกม)
     function ntFighting(){
-      if(window.__br2Viewer){ return ST.peerFight===undefined?false:!!ST.peerFight; }
-      var f=window.__br2Fight&&window.__br2Fight(); if(!f||f.failed) return true;
-      return f.state===true;
+      if(window.__br2Viewer){ return ST.peerFight===true; }
+      var f=window.__br2Fight&&window.__br2Fight(); return !!(f&&f.ready&&f.state===true);
     }
     function ntFightTick(){
       if(window.__br2Viewer||typeof window.__br2FightPoll!=='function') return;
       window.__br2FightPoll().then(function(st){
-        var f=window.__br2Fight(); var v=f.failed?2:(st?1:0);
+        var v=st===true?1:0;
         if(v!==ST.sentFight||Date.now()-(ST.sentFightAt||0)>3000){ ST.sentFight=v; ST.sentFightAt=Date.now(); try{ lsSendRaw({t:'sf',f:v}); }catch(_){ } }
       });
     }
-    function ntStart(){ ntMenuButton(); ntPlace(); setInterval(function(){ ntFightTick(); ntPlace(); },300); window.addEventListener('resize',function(){ setTimeout(ntPlace,50); }); }
+    function ntStart(){ ntMenuButton(); ntPlace(); ntSendName(); var ns=0, nt=setInterval(function(){ ntSendName(); if(++ns>=12) clearInterval(nt); },5000); setInterval(function(){ ntFightTick(); ntPlace(); },300); window.addEventListener('resize',function(){ setTimeout(ntPlace,50); }); }
     ST.ntPlace=ntPlace; // ใช้ทดสอบ
 
     function stStart(){

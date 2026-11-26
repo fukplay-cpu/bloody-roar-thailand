@@ -419,6 +419,12 @@ function setBusy(value) {
   $("joinBtn").disabled = value;
 }
 
+/* จำชื่อผู้เล่นไว้ในเครื่อง */
+window.addEventListener("DOMContentLoaded", () => {
+  const inp = document.getElementById("playerName"); if (!inp) return;
+  try { const v = localStorage.getItem("br2_player_name"); if (v) inp.value = v; } catch (_) {}
+  inp.addEventListener("input", () => { try { localStorage.setItem("br2_player_name", inp.value.trim().slice(0, 20)); } catch (_) {} });
+});
 function playerName() {
   return (
     $("playerName").value.trim() || "Player"
@@ -980,6 +986,8 @@ function launchFix6() {
     // ชื่อผู้เล่นสำหรับป้ายชื่อบนจอเกม (คนสร้างห้อง = P1)
     if (lastPlayers[0] && lastPlayers[0].name) gameURL.searchParams.set("n1", String(lastPlayers[0].name).slice(0, 20));
     if (lastPlayers[1] && lastPlayers[1].name) gameURL.searchParams.set("n2", String(lastPlayers[1].name).slice(0, 20));
+    // ชื่อล่าสุดในช่องของเครื่องนี้ (เปลี่ยนหลังเข้าห้องแล้วก็ยังใช้ได้) → ส่งให้อีกเครื่องตอนเริ่มเกม
+    gameURL.searchParams.set("me", playerName());
     if (idx >= 0) gameURL.searchParams.set("role", String(idx + 1));
   }
 
