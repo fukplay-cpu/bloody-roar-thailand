@@ -4104,7 +4104,7 @@ try {
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
           try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=1500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
       var dc=pc.createDataChannel('in',{ordered:false,maxRetransmits:0}); ST.dc=dc;
-      dc.onmessage=function(e){ try{ var d=JSON.parse(e.data); if(d&&d.t==='sm') stOnMacro(d); else stOnInput(d); }catch(_){ } };
+      dc.onmessage=function(e){ try{ var d=JSON.parse(e.data); if(ST.peerAway) stPeerAway(false,2); if(d&&d.t==='sm') stOnMacro(d); else stOnInput(d); }catch(_){ } };
       var offer=await pc.createOffer(); await pc.setLocalDescription(offer);
       await stWaitIce(pc,2500);
       stSendSig('offer',{type:pc.localDescription.type,sdp:pc.localDescription.sdp});
@@ -4261,6 +4261,8 @@ try {
     function stOnMessage(d){
       if(d.t==='sd'){ stOnSigChunk(d); return true; }
       if(d.t==='sh'){ if(stRole()===1) stHostOffer().catch(function(e){ stLog('สร้างการเชื่อมต่อไม่สำเร็จ: '+(e.message||e),'err'); }); return true; }
+      // อีกเครื่องยังส่งปุ่ม/สถานะมาอยู่ = ไม่ได้พับจอแล้ว → ปิดป้าย "พับจออยู่" (กันข้อความ "กลับมาแล้ว" หาย)
+      if(ST.peerAway&&(d.t==='si'||d.t==='sf'||d.t==='sm')) stPeerAway(false, stRole()===1?2:1);
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
       if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='sa'){ stPeerAway(!!d.a, d.p); return true; }
@@ -4347,7 +4349,7 @@ try {
       try{ if(!LS.ws||LS.ws.readyState>1){ stLog('ต่อห้องใหม่หลังพับจอ','muted'); lsConnect(); } }catch(_){ }
       var tries=0;
       (function wait(){ // รอห้องเชื่อมต่อแล้วค่อยแจ้ง/ขอภาพใหม่
-        if(LS.ws&&LS.ws.readyState===1){ stSendAway(false); if(stRole()===2){ var cs=ST.pc&&ST.pc.connectionState; if(cs!=='connected'){ stClosePc(); } stHelloSoon(0); } return; }
+        if(LS.ws&&LS.ws.readyState===1){ stSendAway(false); setTimeout(function(){ if(!document.hidden) stSendAway(false); },1000); setTimeout(function(){ if(!document.hidden) stSendAway(false); },3000); if(stRole()===2){ var cs=ST.pc&&ST.pc.connectionState; if(cs!=='connected'){ stClosePc(); } stHelloSoon(0); } return; }
         if(++tries<40) setTimeout(wait,250);
       })();
     }
