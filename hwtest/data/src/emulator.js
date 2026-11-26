@@ -714,7 +714,12 @@ class EmulatorJS {
                     const coreFilename = "/" + this.fileName;
                     const coreFilePath = coreFilename.substring(0, coreFilename.length - coreFilename.split("/").pop().length);
                     if (k === "!!notCompressedData") {
-                        this.gameManager.FS.writeFile(coreFilePath + assetUrl.split("/").pop().split("#")[0].split("?")[0], data[k]);
+                        const outName = assetUrl.split("/").pop().split("#")[0].split("?")[0];
+                        this.gameManager.FS.writeFile(coreFilePath + outName, data[k]);
+                        // BR2 hwtest: core may ask for the BIOS of another region name → provide the same file under all PS1 names
+                        if (type === "bios" && /^scph55\d\d\.bin$/i.test(outName)) {
+                            ["scph5500.bin", "scph5501.bin", "scph5502.bin"].forEach(n => { if (n !== outName) this.gameManager.FS.writeFile(coreFilePath + n, data[k]); });
+                        }
                         break;
                     }
                     if (k.endsWith("/")) continue;
