@@ -150,6 +150,7 @@
       <button data-act="resetgame" title="รีเฟรชตัวเกมโดยไม่โหลดหน้าเว็บใหม่ และคงการเชื่อมต่อออนไลน์ไว้">รีเฟรชเกม</button>
       <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
         <button data-act="dot1" id="btn-dot1" title="เปิด/ปิดฟิลเตอร์จุดภาพ (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ</button>
+        <button data-act="ramprobe" title="ทดสอบอ่านหน่วยความจำเกม (ชั่วคราว)">🧪 ทดสอบ RAM</button>
         <button data-act="macro" title="ตั้งคำสั่งให้ปุ่ม M1 และ M2">ตั้งค่ามาโคร M1/M2</button>
         <button data-act="aspect" id="btn-aspect" title="สลับภาพเกมระหว่าง 4:3 (สัดส่วนเดิม) กับยืดเต็มจอ (ใช้ได้ตอนจอแนวนอน)">ภาพ: 4:3</button>
         <button data-act="dot2" id="btn-dot2" title="ฟิลเตอร์จุดภาพ 2 เท่า — จุดใหญ่ขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ 2×</button>
@@ -4031,6 +4032,70 @@ void main()
       }
       var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window); if(coarse&&!window.__br2PadHidden) pad.classList.add('show'); applyPadLayout();
     }
+    // ===== ทดสอบอ่าน RAM ของเครื่อง PS1 จำลอง (ชั่วคราว ใช้หาวิธีรู้ว่า "กำลังสู้") =====
+    // เก็บหน่วยความจำของ emulator ตอนถูกสร้าง (ไม่ต้องแก้ตัว emulator)
+    var br2Mems=[];
+    (function(){ try{ var M0=WebAssembly.Memory; if(M0.__br2) return;
+      var W=function(d){ var m=new M0(d); try{ br2Mems.push(m); }catch(_){ } return m; };
+      W.prototype=M0.prototype; W.__br2=true; WebAssembly.Memory=W; }catch(_){ } })();
+    var RP={base:-1,a:[],b:[],el:null};
+    function rpHeap(){ for(var i=br2Mems.length-1;i>=0;i--){ try{ var u=new Uint8Array(br2Mems[i].buffer); if(u.length>=64*1048576) return u; }catch(_){ } } return null; }
+    function rpOut(t){ var o=document.getElementById('rp-out'); if(o) o.textContent=t; }
+    async function rpFindBase(){
+      var H=rpHeap(); if(!H) return 'ไม่พบหน่วยความจำของ emulator';
+      var M=ng&&ng.getEmscriptenModule&&ng.getEmscriptenModule(); if(!M||!M._cmd_cheat_set_code) return 'ไม่มีคำสั่งสูตรโกง';
+      // เขียนค่าทดสอบ 8 ไบต์ที่ต้น RAM (0x80000000 ช่วงที่ไม่ได้ใช้) ผ่านสูตรโกง แล้วหาว่าไปโผล่ตรงไหน
+      var code='80000000 B2E7+80000002 5A1C+80000004 C3D9+80000006 7E41', p=M._malloc(code.length+1); H=rpHeap();
+      for(var i=0;i<code.length;i++) H[p+i]=code.charCodeAt(i); H[p+code.length]=0;
+      try{ M._cmd_cheat_realloc(1); M._cmd_cheat_set_code(0,p); M._cmd_cheat_toggle_index(1,0); M._cmd_cheat_apply_cheats(); }catch(e){ return 'สูตรโกงใช้ไม่ได้: '+e; }
+      await new Promise(function(r){ setTimeout(r,700); });
+      H=rpHeap(); var sig=[0xE7,0xB2,0x1C,0x5A,0xD9,0xC3,0x41,0x7E], hits=[];
+      for(var j=0;j<H.length-8;j+=2){ if(H[j]!==0xE7||H[j+1]!==0xB2) continue; var ok=true; for(var k=2;k<8;k++){ if(H[j+k]!==sig[k]){ ok=false; break; } } if(ok){ hits.push(j); if(hits.length>3) break; } }
+      try{ M._cmd_cheat_toggle_index(1,0); M._cmd_cheat_realloc(0); M._cmd_cheat_apply_cheats(); }catch(_){ }
+      if(hits.length!==1) return 'หาตำแหน่ง RAM ไม่เจอ (เจอ '+hits.length+' จุด)';
+      RP.base=hits[0]; for(var z=0;z<8;z++) H[RP.base+z]=0; // คืนค่าเดิม
+      return null;
+    }
+    async function rpSnap(fight){
+      if(!ng){ rpOut('ยังไม่ได้เปิดเกม'); return; }
+      if(RP.base<0){ rpOut('กำลังหาตำแหน่ง RAM…'); var e=await rpFindBase(); if(e){ rpOut('❌ '+e); return; } }
+      var H=rpHeap(); var snap=H.slice(RP.base,RP.base+0x200000);
+      (fight?RP.b:RP.a).push(snap);
+      rpOut('✅ เจอ RAM แล้ว · เก็บแล้ว: ไม่ได้สู้ '+RP.a.length+' ครั้ง · กำลังสู้ '+RP.b.length+' ครั้ง\n(เก็บแบบละอย่างน้อย 3 ครั้ง ต่างฉาก/ต่างตัวละคร แล้วกดวิเคราะห์)');
+    }
+    function rpAnalyze(){
+      if(RP.a.length<2||RP.b.length<2){ rpOut('ต้องเก็บอย่างน้อยแบบละ 2 ครั้งก่อน'); return; }
+      var res=[], n=0x200000;
+      for(var i=0;i<n;i++){
+        var va=RP.a[0][i], vb=RP.b[0][i]; if(va===vb) continue; var ok=true;
+        for(var x=1;x<RP.a.length&&ok;x++) if(RP.a[x][i]!==va) ok=false;
+        for(var y=1;y<RP.b.length&&ok;y++) if(RP.b[y][i]!==vb) ok=false;
+        if(ok){ res.push(i); }
+      }
+      var hex=function(v,w){ var t=v.toString(16).toUpperCase(); while(t.length<w) t='0'+t; return t; };
+      var lines=res.slice(0,14).map(function(i){ return '80'+hex(i,6)+' : '+hex(RP.a[0][i],2)+' → '+hex(RP.b[0][i],2); });
+      rpOut('ผลวิเคราะห์ (ไม่ได้สู้ '+RP.a.length+' / กำลังสู้ '+RP.b.length+' ครั้ง)\nเจอตำแหน่งที่ใช้แยกได้ '+res.length+' จุด\n'+lines.join('\n')+(res.length>14?'\n…':'')+'\n\n📸 แคปหน้าจอนี้ส่งให้ Claude');
+    }
+    function br2RamProbeOpen(){
+      if(!RP.el){
+        var d=document.createElement('section'); d.id='rp-panel';
+        d.style.cssText='position:fixed;z-index:31;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);width:min(420px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:auto;box-sizing:border-box;padding:12px;background:rgba(12,12,14,.97);border:1px solid #c9a24b;border-radius:12px;color:#f4f4f4;font:13px system-ui,sans-serif';
+        d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong>🧪 ทดสอบอ่าน RAM</strong><button type="button" id="rp-x">✕</button></div>'
+          +'<p style="margin:4px 0 8px;font-size:12px;color:#c4c4c4;line-height:1.5">1) อยู่หน้าที่ไม่ได้สู้ (เมนู/เลือกตัว/หน้า VS) กด “ไม่ได้สู้”<br>2) ปิดหน้าต่างนี้ เข้าไปสู้ ระหว่างสู้เปิดมากด “กำลังสู้”<br>ทำซ้ำแบบละ 3 ครั้ง ต่างฉากกัน แล้วกด “วิเคราะห์”</p>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button type="button" id="rp-a">ไม่ได้สู้</button><button type="button" id="rp-b">กำลังสู้</button></div>'
+          +'<button type="button" id="rp-go" style="width:100%;margin-top:6px">วิเคราะห์</button>'
+          +'<pre id="rp-out" style="white-space:pre-wrap;font:12px ui-monospace,monospace;background:#000;border:1px solid #444;border-radius:8px;padding:8px;margin:8px 0 0;min-height:3em">พร้อม</pre>';
+        document.body.appendChild(d); RP.el=d;
+        d.querySelectorAll('button').forEach(function(b){ b.style.cssText+='background:#242428;color:#fff;border:1px solid #777;border-radius:8px;padding:8px 10px;font:inherit'; });
+        document.getElementById('rp-x').onclick=function(){ d.hidden=true; };
+        document.getElementById('rp-a').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(false).then(function(){ d.hidden=false; }); },120); };
+        document.getElementById('rp-b').onclick=function(){ d.hidden=true; setTimeout(function(){ rpSnap(true).then(function(){ d.hidden=false; }); },120); };
+        document.getElementById('rp-go').onclick=rpAnalyze;
+      }
+      RP.el.hidden=false;
+    }
+    window.__br2RamProbe={RP:RP,heap:rpHeap,findBase:rpFindBase};
+
     // ===== ตัวนับเฟรมของเกม: ตัวเกมอ่านจอยผ่าน navigator.getGamepads() ครั้งเดียวต่อ 1 เฟรม (บนเธรดหลัก) =====
     var br2Frame=0, br2FrameT=0, br2FrameHooks=[], br2FramePending=false;
     function br2Pads(){ try{ if(window.__br2RawPads) return window.__br2RawPads()||[]; return navigator.getGamepads?(navigator.getGamepads()||[]):[]; }catch(_){ return []; } }
@@ -4977,6 +5042,7 @@ void main()
         else if(act==='dot2'){ setDotMode(2); }
         else if(act==='aspect'){ br2ToggleAspect(); }
         else if(act==='macro'){ br2MacroOpen(); }
+        else if(act==='ramprobe'){ br2RamProbeOpen(); }
         else if(act==='hd'){ toggleHd(); }
         else if(act==='disc'){ if(isMulti&&discs.length>1){ await swapDisc((curDiscIndex+1)%discs.length); } }
         else if(!ng){ log('Charge d\u2019abord un disque.','muted'); }
