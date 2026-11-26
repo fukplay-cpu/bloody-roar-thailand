@@ -59,6 +59,16 @@
 <div id="fps"></div>
 
 <script>
+// เก็บข้อความจากตัวจำลองไว้แสดงเมื่อเปิดเกมไม่สำเร็จ (ไม่ต้องเปิด F12)
+(function(){ var buf=window.__hwlog=[]; ['log','warn','error','info'].forEach(function(k){ var o=console[k]; console[k]=function(){ try{ var t=[].slice.call(arguments).map(function(x){ return x&&x.stack?String(x.stack).split('\n').slice(0,2).join(' '):String(x); }).join(' '); buf.push(k[0].toUpperCase()+' '+t.slice(0,240)); if(buf.length>300) buf.shift(); if(/Failed to start game/i.test(t)) setTimeout(window.__hwFail,300); }catch(_){ } return o.apply(console,arguments); }; });
+  window.addEventListener('error',function(e){ buf.push('E '+(e.message||e)); });
+  window.__hwFail=function(){ if(document.getElementById('hwfail')) return; var keep=buf.filter(function(l){ return /libretro|ERROR|WARN|error|fail|bios|\.cue|\.bin|ISO|CD|track|Exception|abort|RuntimeError|memory/i.test(l)&&!/Translation not found|invalid core option|^L beetle_psx_hw_[a-z0-9_]+ /.test(l); }).slice(-50);
+    var d=document.createElement('div'); d.id='hwfail'; d.style.cssText='position:fixed;left:8px;right:8px;top:8px;z-index:100000;background:#141824;border:1px solid #ff9a9a;border-radius:12px;padding:10px;color:#eee;font:13px system-ui,sans-serif;max-height:80vh;overflow:auto';
+    var info=window.__hwInfo||'';
+    d.innerHTML='<b style="color:#ff9a9a">เปิดเกมไม่สำเร็จ</b> — กด "คัดลอก" แล้ววางส่งให้ Claude<br><button id="hwcopy" style="margin:6px 0;background:#e52b43;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:600">คัดลอก</button><pre style="white-space:pre-wrap;font:11px ui-monospace,monospace;margin:0"></pre>';
+    var text='HWLOG '+info+'\n'+keep.join('\n'); d.querySelector('pre').textContent=text; document.body.appendChild(d);
+    d.querySelector('#hwcopy').onclick=function(){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ d.querySelector('#hwcopy').textContent='คัดลอกแล้ว ✅'; },function(){ window.prompt('คัดลอกข้อความนี้',text); }); else window.prompt('คัดลอกข้อความนี้',text); }; };
+})();
 (function(){
   var biosFile=null, gameFile=null;
   var $=function(id){ return document.getElementById(id); };
@@ -91,6 +101,7 @@
     if(!biosFile||!gameFile) return;
     $('go').disabled=true; st('go-st','กำลังโหลด… (ไฟล์เกมทั้งก้อนต้องอ่านเข้าหน่วยความจำ อาจใช้เวลาครู่หนึ่ง)');
     var res=$('res').value, pgxp=$('pgxp').checked;
+    window.__hwInfo='bios '+biosFile.size+'B · game '+gameFile.name+' '+gameFile.size+'B · '+res+(pgxp?' pgxp':'')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
     window.EJS_player='#ejs';
     window.EJS_core='mednafen_psx_hw';
     window.EJS_pathtodata='hwtest/data/';
