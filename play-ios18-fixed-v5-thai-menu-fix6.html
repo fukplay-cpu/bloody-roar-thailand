@@ -150,7 +150,7 @@
       <button data-act="resetgame" title="รีเฟรชตัวเกมโดยไม่โหลดหน้าเว็บใหม่ และคงการเชื่อมต่อออนไลน์ไว้">รีเฟรชเกม</button>
       <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
         <button data-act="dot1" id="btn-dot1" title="เปิด/ปิดฟิลเตอร์จุดภาพ (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ</button>
-        <button data-act="ramprobe" title="ทดสอบอ่านหน่วยความจำเกม (ชั่วคราว)">🧪 ทดสอบ RAM</button>
+        <button data-act="ramprobe" id="btn-ramprobe" hidden title="ทดสอบอ่านหน่วยความจำเกม">🧪 ทดสอบ RAM</button>
         <button data-act="macro" title="ตั้งคำสั่งให้ปุ่ม M1 และ M2">ตั้งค่ามาโคร M1/M2</button>
         <button data-act="aspect" id="btn-aspect" title="สลับภาพเกมระหว่าง 4:3 (สัดส่วนเดิม) กับยืดเต็มจอ (ใช้ได้ตอนจอแนวนอน)">ภาพ: 4:3</button>
         <button data-act="dot2" id="btn-dot2" title="ฟิลเตอร์จุดภาพ 2 เท่า — จุดใหญ่ขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">จุดภาพ 2×</button>
@@ -4113,19 +4113,19 @@ void main()
       RP.el.hidden=false;
     }
     window.__br2RamProbe={RP:RP,heap:rpHeap,findBase:rpFindBase};
+    try{ if(/[?&]ramprobe=1/.test(location.search)){ var _rb=document.getElementById('btn-ramprobe'); if(_rb) _rb.hidden=false; } }catch(_){ }
 
     // ===== ตรวจว่า "กำลังสู้" จาก RAM ของเกม (เวอร์ชัน USA) — ได้จากการทดสอบบน iPhone =====
     // 14 ตำแหน่งที่ค่าต่างกันชัดเจนระหว่างตอนสู้/ไม่ได้สู้ → ให้โหวตรวมกัน (ตรงค่าตอนสู้ ≥ 11 จุด = กำลังสู้)
-    var FIGHT_SIG=[[0x04E8A5,0x00,0xFF],[0x04F89F,0x01,0x00],[0x05ABAF,0x01,0x00],[0x070311,0x01,0x00],[0x073A7F,0x01,0x00],
-      [0x0B5FA5,0x00,0x01],[0x0B9D31,0x00,0x01],[0x0BA101,0x00,0x01],[0x0BDF01,0x00,0x01],[0x0BDFD1,0x00,0x01],
-      [0x0BE02D,0x00,0x01],[0x0C21D9,0x00,0x01],[0x1D22EA,0x1D,0x00],[0x1D3DD5,0x00,0x80]];
-    var FD={state:null,score:0,total:14,busy:false,failed:false,stable:0,last:null};
+    // ค่าที่เรียนรู้จากการทดสอบบน iPhone (เกม USA): 2 ไบต์ที่เป็นสถานะของเกม — ค่าเหล่านี้ = กำลังสู้
+    var FIGHT_SIG=[[0x1E43CE,[11,12,13]],[0x1E65A2,[11,12,5,13]]];
+    var FD={state:null,score:0,total:2,busy:false,failed:false,stable:0,last:null};
     var FIGHT_LEARNED=null; try{ var _fl=localStorage.getItem('br2_fight_sig'); if(_fl) FIGHT_LEARNED=JSON.parse(_fl); }catch(_){ }
     function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0, i;
       if(FIGHT_LEARNED&&FIGHT_LEARNED.length){ FD.total=FIGHT_LEARNED.length;
         for(i=0;i<FIGHT_LEARNED.length;i++){ if(FIGHT_LEARNED[i][1].indexOf(H[RP.base+FIGHT_LEARNED[i][0]])>=0) n++; } return n; }
       FD.total=FIGHT_SIG.length;
-      for(i=0;i<FIGHT_SIG.length;i++){ if(H[RP.base+FIGHT_SIG[i][0]]===FIGHT_SIG[i][2]) n++; } return n; }
+      for(i=0;i<FIGHT_SIG.length;i++){ if(FIGHT_SIG[i][1].indexOf(H[RP.base+FIGHT_SIG[i][0]])>=0) n++; } return n; }
     async function br2FightPoll(){
       if(!ng||FD.busy||FD.failed) return FD.state;
       if(RP.base<0){ if(!window.__br2FrameInfo||!window.__br2FrameInfo().alive) return null; FD.busy=true;
