@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090911">
+<title>BR2 ทดสอบภาพคมชัด 2 (Beetle PSX HW / webretro)</title>
+<style>
+  body{margin:0;background:#090911;color:#eee;font:15px system-ui,-apple-system,sans-serif}
+  #setup{max-width:560px;margin:0 auto;padding:16px}
+  h1{font-size:19px;margin:6px 0 4px}
+  .note{color:#9aa3b2;font-size:13px;line-height:1.5}
+  .card{background:#141824;border:1px solid #2a3142;border-radius:12px;padding:12px;margin:12px 0}
+  .card b{color:#ffd27a}
+  label{display:block;margin:6px 0}
+  select,button,input[type=file]{font:inherit}
+  button{background:#e52b43;color:#fff;border:0;border-radius:10px;padding:11px 16px;font-weight:600}
+  button:disabled{opacity:.45}
+  .st{font-size:13px;margin-top:6px;color:#9fe0a8;white-space:pre-line}
+  .st.err{color:#ff9a9a}
+  #canvas{position:fixed;inset:0;width:100vw;height:100vh;display:none;background:#000;image-rendering:auto}
+  #keys{position:fixed;left:8px;bottom:8px;z-index:5;background:#000a;color:#ccc;font:12px system-ui;padding:4px 8px;border-radius:6px;display:none}
+  #logbox{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:#141824;border:1px solid #ff9a9a;border-radius:12px;padding:10px;display:none;max-height:80vh;overflow:auto}
+  #logbox pre{white-space:pre-wrap;font:11px ui-monospace,monospace;margin:6px 0 0}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🧪 ทดสอบภาพคมชัด 2 (Beetle PSX HW รุ่น webretro)</h1>
+  <div class="note">หน้าแยกจากเกมหลัก · ใช้ตัวจำลองรุ่นที่โปรเจกต์ webretro คอมไพล์ไว้ (คนละรุ่นกับหน้าทดสอบ 1) · เล่นคนเดียว ใช้คีย์บอร์ด/จอย · ไฟล์ทั้งหมดอยู่ในเครื่องคุณ</div>
+
+  <div class="card">
+    <b>1) ไฟล์ BIOS</b> (SCPH5501.BIN)
+    <label><input type="file" id="bios-file"></label>
+    <div id="bios-st" class="st"></div>
+  </div>
+
+  <div class="card">
+    <b>2) ไฟล์เกม</b>
+    <div id="game-st" class="st">กำลังหาไฟล์เกมที่หน้าเล่นปกติโหลดเก็บไว้…</div>
+    <label class="note">หรือเลือกไฟล์ .bin เอง: <input type="file" id="game-file"></label>
+  </div>
+
+  <div class="card">
+    <b>3) ตั้งค่าภาพ</b>
+    <label>ตัววาดภาพ:
+      <select id="rdr">
+        <option value="hardware" selected>การ์ดจอ</option>
+        <option value="software">CPU</option>
+      </select></label>
+    <label>ความละเอียด:
+      <select id="res">
+        <option value="1x(native)">1 เท่า (ปกติ)</option>
+        <option value="2x">2 เท่า</option>
+        <option value="4x" selected>4 เท่า</option>
+        <option value="8x">8 เท่า</option>
+      </select></label>
+    <label><input type="checkbox" id="pgxp" checked> แก้ภาพสั่น (PGXP)</label>
+  </div>
+
+  <button id="go" disabled>▶ เริ่มทดสอบ</button>
+  <div id="go-st" class="st"></div>
+  <div class="note" style="margin-top:14px">ปุ่ม: ลูกศร=ทิศทาง · Z=✕ · X=○ · A=□ · S=△ · Q/W=L1/R1 · Enter=Start · Shift ขวา=Select · F1=เมนู RetroArch · ตัวเลข fps ขึ้นมุมบนของภาพ</div>
+</div>
+<canvas id="canvas" tabindex="0"></canvas>
+<div id="keys">ลูกศร · Z=✕ X=○ A=□ S=△ · Enter=Start · F1=เมนู</div>
+<div id="logbox"><b style="color:#ff9a9a">มีปัญหา</b> — กด "คัดลอก" แล้ววางส่งให้ Claude <button id="logcopy" style="padding:6px 12px">คัดลอก</button><pre id="logpre"></pre></div>
+
+<script>
+var LOG=[];
+function L(t){ LOG.push(String(t).slice(0,240)); if(LOG.length>400) LOG.shift(); }
+function showLog(){ var keep=LOG.filter(function(l){ return /error|fail|warn|bios|firmware|cue|bin|region|libretro|abort|exception|GL|renderer|content/i.test(l); }).slice(-60);
+  var t='HW2LOG '+(window.__info||'')+'\n'+keep.join('\n'); document.getElementById('logpre').textContent=t; document.getElementById('logbox').style.display='block';
+  document.getElementById('logcopy').onclick=function(){ if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ document.getElementById('logcopy').textContent='คัดลอกแล้ว ✅'; },function(){ prompt('คัดลอก',t); }); else prompt('คัดลอก',t); }; }
+window.addEventListener('error',function(e){ L('ERROR '+(e.message||e)); });
+(function(){
+  var biosBlob=null, gameFile=null, cueText=null;
+  var $=function(id){ return document.getElementById(id); };
+  function st(id,t,err){ var e=$(id); e.textContent=t; e.className='st'+(err?' err':''); }
+  function ready(){ $('go').disabled=!(biosBlob&&gameFile); }
+  function idb(){ return new Promise(function(res,rej){ var r=indexedDB.open('br2-hwtest',1); r.onupgradeneeded=function(){ r.result.createObjectStore('kv'); }; r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; }); }
+  async function kv(k,v){ var db=await idb(); return new Promise(function(res,rej){ var tx=db.transaction('kv',v===undefined?'readonly':'readwrite'), s=tx.objectStore('kv'); var q=v===undefined?s.get(k):s.put(v,k); q.onsuccess=function(){ res(q.result); }; q.onerror=function(){ rej(q.error); }; }); }
+  function setBios(b,name){ biosBlob=b; st('bios-st','✓ '+name+' ('+Math.round(b.size/1024)+' KB)'); ready(); }
+  kv('bios').then(function(r){ if(r&&r.blob) setBios(r.blob,r.name+' (จำไว้จากหน้าทดสอบ 1)'); }).catch(function(){});
+  $('bios-file').addEventListener('change',async function(e){ var f=e.target.files[0]; if(!f) return; var b=new Blob([await f.arrayBuffer()]); setBios(b,f.name); try{ await kv('bios',{blob:b,name:f.name}); }catch(_){ } });
+  (async function(){
+    try{
+      var root=await navigator.storage.getDirectory(), bins=[], cues=[];
+      for await (var [name,h] of root.entries()){ if(h.kind!=='file'||name.indexOf('br2-')!==0) continue; if(/\.bin$/i.test(name)) bins.push(h); else if(/\.cue$/i.test(name)) cues.push(h); }
+      if(cues.length){ try{ cueText=await (await cues[0].getFile()).text(); }catch(_){ } }
+      if(!bins.length){ st('game-st','ไม่พบไฟล์เกมในเครื่องนี้ — เปิดเกมจากหน้าเล่นปกติ 1 ครั้งก่อน หรือเลือกไฟล์เอง',true); return; }
+      var files=await Promise.all(bins.map(function(h){ return h.getFile(); })); files.sort(function(a,b){ return b.size-a.size; });
+      gameFile=files[0]; st('game-st','✓ '+gameFile.name.replace(/^br2-/,'')+' ('+(gameFile.size/1048576).toFixed(0)+' MB)'+(cueText?' + ไฟล์ .cue ต้นฉบับ':''));
+      ready();
+    }catch(e){ st('game-st','อ่านไฟล์ที่เก็บไว้ไม่ได้ — เลือกไฟล์เอง',true); }
+  })();
+  $('game-file').addEventListener('change',function(e){ var f=e.target.files[0]; if(!f) return; gameFile=f; cueText=null; st('game-st','✓ '+f.name); ready(); });
+
+  $('go').addEventListener('click',function(){
+    if(!biosBlob||!gameFile) return; $('go').disabled=true;
+    var rdr=$('rdr').value, res=$('res').value, pgxp=$('pgxp').checked;
+    window.__info='game '+gameFile.size+'B · bios '+biosBlob.size+'B · '+rdr+' '+res+(pgxp?' pgxp':'')+' · cue '+(cueText?'orig':'auto')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
+    st('go-st','กำลังโหลดตัวจำลอง…');
+    var canvas=$('canvas');
+    window.Module={
+      canvas:canvas, noInitialRun:true,
+      arguments:['/rom/game.cue','--verbose'],
+      locateFile:function(p){ return 'hwtest2/'+p; },
+      print:function(t){ L(t); }, printErr:function(t){ L(t); },
+      onAbort:function(w){ L('ABORT '+w); showLog(); },
+      onRuntimeInitialized:async function(){
+        try{
+          var FS=window.FS||Module.FS;
+          FS.createPath('/','home/web_user/retroarch/userdata/system',true,true);
+          FS.createPath('/','home/web_user/retroarch/userdata/saves',true,true);
+          FS.createPath('/','rom',true,true);
+          var bios=new Uint8Array(await biosBlob.arrayBuffer());
+          ['scph5500.bin','scph5501.bin','scph5502.bin'].forEach(function(n){ FS.writeFile('/home/web_user/retroarch/userdata/system/'+n,bios); });
+          // เขียนไฟล์เกมทีละ 16MB (ไม่ต้องมีสำเนา 2 ก้อนในหน่วยความจำ)
+          var s=FS.open('/rom/game.bin','w'), CH=16*1048576;
+          for(var o=0;o<gameFile.size;o+=CH){ var part=new Uint8Array(await gameFile.slice(o,o+CH).arrayBuffer()); FS.write(s,part,0,part.length); st('go-st','กำลังโหลดเกม '+Math.round(Math.min(o+CH,gameFile.size)*100/gameFile.size)+'%'); }
+          FS.close(s);
+          var cue=cueText?cueText.replace(/FILE\s+"[^"]*"/i,'FILE "game.bin"'):'FILE "game.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n';
+          FS.writeFile('/rom/game.cue',cue); L('CUE: '+cue.replace(/\s+/g,' '));
+          FS.writeFile('/home/web_user/retroarch/userdata/retroarch-core-options.cfg',
+            'beetle_psx_hw_renderer = "'+rdr+'"\nbeetle_psx_hw_internal_resolution = "'+res+'"\n'+
+            'beetle_psx_hw_pgxp_mode = "'+(pgxp?'memory only':'disabled')+'"\nbeetle_psx_hw_pgxp_texture = "'+(pgxp?'enabled':'disabled')+'"\n'+
+            'beetle_psx_hw_dither_mode = "1x(native)"\nbeetle_psx_hw_filter = "nearest"\n');
+          FS.writeFile('/home/web_user/retroarch/userdata/retroarch.cfg',
+            'rgui_show_start_screen = "false"\nfps_show = "true"\nvideo_vsync = "true"\nsavefile_directory = "/home/web_user/retroarch/userdata/saves"\n'+
+            'system_directory = "/home/web_user/retroarch/userdata/system"\ninput_menu_toggle = "f1"\ninput_player1_start = "enter"\ninput_player1_select = "rshift"\n'+
+            'input_player1_a = "x"\ninput_player1_b = "z"\ninput_player1_x = "s"\ninput_player1_y = "a"\ninput_player1_l = "q"\ninput_player1_r = "w"\n'+
+            'input_exit_emulator = "nul"\ninput_toggle_fullscreen = "nul"\n');
+          $('setup').style.display='none'; canvas.style.display='block'; $('keys').style.display='block';
+          canvas.width=innerWidth*devicePixelRatio|0; canvas.height=innerHeight*devicePixelRatio|0;
+          L('callMain'); Module.callMain(Module.arguments); canvas.focus();
+          setTimeout(function(){ $('keys').style.display='none'; },8000);
+        }catch(e){ L('START ERROR '+(e&&e.stack||e)); showLog(); }
+      }
+    };
+    var sc=document.createElement('script'); sc.src='hwtest2/mednafen_psx_hw_libretro.js';
+    sc.onerror=function(){ st('go-st','โหลดตัวจำลองไม่ได้',true); }; document.body.appendChild(sc);
+  });
+})();
+</script>
+</body>
+</html>
