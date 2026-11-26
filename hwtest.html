@@ -48,6 +48,11 @@
         <option value="4x" selected>4 เท่า (แนะนำ)</option>
         <option value="8x">8 เท่า (หนัก)</option>
       </select></label>
+    <label>ตัววาดภาพ:
+      <select id="rdr">
+        <option value="software" selected>CPU (ภาพถูกต้อง แต่หนักขึ้นตามความละเอียด)</option>
+        <option value="hardware">การ์ดจอ (เร็ว แต่บนเว็บภาพอาจเพี้ยน)</option>
+      </select></label>
     <label><input type="checkbox" id="pgxp" checked> แก้ภาพสั่น/บิดเบี้ยว (PGXP)</label>
   </div>
 
@@ -100,7 +105,7 @@
   $('go').addEventListener('click',function(){
     if(!biosFile||!gameFile) return;
     $('go').disabled=true; st('go-st','กำลังโหลด… (ไฟล์เกมทั้งก้อนต้องอ่านเข้าหน่วยความจำ อาจใช้เวลาครู่หนึ่ง)');
-    var res=$('res').value, pgxp=$('pgxp').checked;
+    var res=$('res').value, pgxp=$('pgxp').checked, rdr=$('rdr').value;
     window.__hwInfo='bios '+biosFile.size+'B · game '+gameFile.name+' '+gameFile.size+'B · '+res+(pgxp?' pgxp':'')+' · '+navigator.userAgent.replace(/^.*?\) /,'');
     window.EJS_player='#ejs';
     window.EJS_core='mednafen_psx_hw';
@@ -114,20 +119,20 @@
     window.EJS_language='en-US'; window.EJS_disableAutoLang=true;
     window.EJS_color='#e52b43';
     window.EJS_defaultOptions={
-      'beetle_psx_hw_renderer':'hardware',
+      'beetle_psx_hw_renderer':rdr,
       'beetle_psx_hw_internal_resolution':res,
       'beetle_psx_hw_pgxp_mode':pgxp?'memory only':'disabled',
       'beetle_psx_hw_pgxp_texture':pgxp?'enabled':'disabled',
       'beetle_psx_hw_pgxp_vertex':pgxp?'enabled':'disabled',
       'beetle_psx_hw_filter':'nearest',
-      'beetle_psx_hw_dither_mode':'internal resolution',
+      'beetle_psx_hw_dither_mode':'1x(native)',
       'beetle_psx_hw_skip_bios':'enabled'
     };
     window.EJS_onGameStart=function(){
       $('setup').style.display='none'; $('fps').style.display='block';
       var last=0, lastT=performance.now();
       setInterval(function(){ try{ var gm=window.EJS_emulator&&window.EJS_emulator.gameManager; if(!gm) return; var f=gm.getFrameNum(), n=performance.now();
-        if(last) $('fps').textContent=Math.round((f-last)*1000/(n-lastT))+' fps · '+res+(pgxp?' · PGXP':''); last=f; lastT=n; }catch(_){ } },1000);
+        if(last) $('fps').textContent=Math.round((f-last)*1000/(n-lastT))+' fps · '+(rdr==='software'?'CPU':'GPU')+' '+res+(pgxp?' · PGXP':''); last=f; lastT=n; }catch(_){ } },1000);
     };
     $('game').style.display='block';
     var s=document.createElement('script'); s.src='hwtest/data/loader.js';
