@@ -329,7 +329,7 @@ class EJS_GameManager {
             baseFileName = baseFileName.substring(0, baseFileName.length - baseFileName.split(".").pop().length - 1);
         }
         for (let i = 0; i < fileNames.length; i++) {
-            const contents = " FILE \"" + fileNames[i] + "\" BINARY\n  TRACK 01 MODE1/2352\n   INDEX 01 00:00:00";
+            const contents = " FILE \"" + fileNames[i] + "\" BINARY\n  TRACK 01 MODE2/2352\n   INDEX 01 00:00:00";
             this.FS.writeFile("/" + baseFileName + "-" + i + ".cue", contents);
         }
         if (fileNames.length > 1) {
