@@ -4127,8 +4127,7 @@ void main()
     // ===== ตรวจว่า "กำลังสู้" จาก RAM ของเกม (เวอร์ชัน USA) — ได้จากการทดสอบบน iPhone =====
     // 14 ตำแหน่งที่ค่าต่างกันชัดเจนระหว่างตอนสู้/ไม่ได้สู้ → ให้โหวตรวมกัน (ตรงค่าตอนสู้ ≥ 11 จุด = กำลังสู้)
     // ค่าที่เรียนรู้จากการทดสอบบน iPhone (เกม USA): 2 ไบต์ที่เป็นสถานะของเกม — ค่าเหล่านี้ = กำลังสู้
-    // ชุดใหม่ (26 พ.ย.): ไบต์ "สถานะของเกม" ที่นิ่งตลอดการสู้ (ยืนนิ่ง/ออกท่า/ล้ม) และไม่ซ้ำกับหน้าเมนูใดๆ — โหวต ≥80%
-    var FIGHT_SIG=[[1835228,[1]],[1835268,[1]],[1837388,[1]],[1837428,[1]],[1840032,[1]],[2040510,[103]],[2040516,[24]],[2000501,[16]],[2000509,[16]],[2000517,[24]],[2000525,[24]],[1876874,[0]],[1857147,[0,255]],[1857371,[255,0]],[1857539,[0,255]],[1861893,[0,255]]];
+    var FIGHT_SIG=[[0x1E43CE,[11,12,13]],[0x1E65A2,[11,12,5,13]]];
     var FD={state:null,score:0,total:2,busy:false,failed:false,stable:0,last:null};
     var FIGHT_LEARNED=null; try{ var _fl=/[?&]ramprobe=1/.test(location.search)&&localStorage.getItem('br2_fight_sig'); if(_fl) FIGHT_LEARNED=JSON.parse(_fl); }catch(_){ }
     function br2FightScore(){ var H=rpHeap(); if(!H||RP.base<0) return -1; var n=0, i;
@@ -4148,8 +4147,10 @@ void main()
         FD.failed=false; try{ log('พร้อมตรวจสถานะการสู้แล้ว','ok'); }catch(_){ }
       }
       var sc=br2FightScore(); FD.score=sc; var now=sc>=Math.ceil(FD.total*0.8);
-      if(now===FD.last) FD.stable++; else { FD.last=now; FD.stable=1; }
-      if(FD.stable>=2&&FD.state!==now){ FD.state=now; } // ต้องตรงกัน 2 ครั้งติด กันกระพริบ
+      if(now===FD.last) FD.stable++; else { FD.last=now; FD.stable=1; FD.since=Date.now(); }
+      // เข้าโหมดสู้: ตรงกัน 2 ครั้งติด · ออกจากโหมดสู้: ต้องไม่ใช่ค่าตอนสู้ต่อเนื่อง 3 วินาที (กันป้ายกระพริบ)
+      if(now&&FD.stable>=2&&FD.state!==true){ FD.state=true; }
+      else if(!now&&FD.state!==false&&(FD.state===null?FD.stable>=2:Date.now()-FD.since>=3000)){ FD.state=false; }
       return FD.state;
     }
     window.__br2Fight=function(){ return {state:FD.state,score:FD.score,failed:FD.failed,ready:RP.base>=0}; };
