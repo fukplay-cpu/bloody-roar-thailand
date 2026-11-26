@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090911">
+<title>BR2 ทดสอบภาพคมชัด (Beetle PSX HW)</title>
+<style>
+  body{margin:0;background:#090911;color:#eee;font:15px system-ui,-apple-system,sans-serif}
+  #setup{max-width:560px;margin:0 auto;padding:16px}
+  h1{font-size:19px;margin:6px 0 4px}
+  .note{color:#9aa3b2;font-size:13px;line-height:1.5}
+  .card{background:#141824;border:1px solid #2a3142;border-radius:12px;padding:12px;margin:12px 0}
+  .card b{color:#ffd27a}
+  label{display:block;margin:6px 0}
+  select,button,input[type=file]{font:inherit}
+  button{background:#e52b43;color:#fff;border:0;border-radius:10px;padding:11px 16px;font-weight:600}
+  button.sec{background:#2a3142}
+  button:disabled{opacity:.45}
+  .st{font-size:13px;margin-top:6px;color:#9fe0a8;white-space:pre-line}
+  .st.err{color:#ff9a9a}
+  #game{position:fixed;inset:0;display:none;background:#000}
+  #fps{position:fixed;right:8px;top:8px;z-index:99999;background:#000a;color:#9fe0a8;font:12px ui-monospace,monospace;padding:4px 7px;border-radius:6px;display:none}
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🧪 ทดสอบภาพคมชัด (Beetle PSX HW)</h1>
+  <div class="note">หน้านี้แยกจากเกมหลัก ใช้ตัวจำลองอีกตัวที่วาดภาพด้วยการ์ดจอ เพื่อลองว่าภาพคมขึ้นและยังลื่นไหม · เล่นคนเดียวเท่านั้น (ยังไม่มีออนไลน์/มาโคร/ป้ายชื่อ) · ไฟล์ทุกอย่างอยู่ในเครื่องคุณ ไม่ถูกส่งขึ้นเว็บ</div>
+
+  <div class="card">
+    <b>1) ไฟล์ BIOS</b> (เกม USA ใช้ SCPH5501.BIN)
+    <label><input type="file" id="bios-file"></label>
+    <div id="bios-st" class="st"></div>
+  </div>
+
+  <div class="card">
+    <b>2) ไฟล์เกม</b>
+    <div id="game-st" class="st">กำลังหาไฟล์เกมที่หน้าเล่นปกติโหลดเก็บไว้ในเครื่อง…</div>
+    <label class="note">หรือเลือกไฟล์เกมเอง (.bin / .chd / .pbp): <input type="file" id="game-file"></label>
+  </div>
+
+  <div class="card">
+    <b>3) ตั้งค่าภาพ</b>
+    <label>ความละเอียด:
+      <select id="res">
+        <option value="2x">2 เท่า (เท่าปุ่ม HD เดิม)</option>
+        <option value="4x" selected>4 เท่า (แนะนำ)</option>
+        <option value="8x">8 เท่า (หนัก)</option>
+      </select></label>
+    <label><input type="checkbox" id="pgxp" checked> แก้ภาพสั่น/บิดเบี้ยว (PGXP)</label>
+  </div>
+
+  <button id="go" disabled>▶ เริ่มทดสอบ</button>
+  <div id="go-st" class="st"></div>
+  <div class="note" style="margin-top:14px">ดูมุมขวาบนระหว่างเล่น: ถ้าขึ้น <b>60 fps</b> คือลื่นเต็มที่ · ต่ำกว่า 55 แปลว่าเครื่องเริ่มไม่ไหว ให้ลดความละเอียดลง</div>
+</div>
+<div id="game"><div id="ejs"></div></div>
+<div id="fps"></div>
+
+<script>
+(function(){
+  var biosFile=null, gameFile=null;
+  var $=function(id){ return document.getElementById(id); };
+  function st(id,t,err){ var e=$(id); e.textContent=t; e.className='st'+(err?' err':''); }
+  function ready(){ $('go').disabled=!(biosFile&&gameFile); }
+
+  // ---- BIOS: เก็บไว้ในเครื่องนี้ (IndexedDB) ไม่ต้องเลือกใหม่ทุกครั้ง ----
+  function idb(){ return new Promise(function(res,rej){ var r=indexedDB.open('br2-hwtest',1); r.onupgradeneeded=function(){ r.result.createObjectStore('kv'); }; r.onsuccess=function(){ res(r.result); }; r.onerror=function(){ rej(r.error); }; }); }
+  async function kv(k,v){ var db=await idb(); return new Promise(function(res,rej){ var tx=db.transaction('kv',v===undefined?'readonly':'readwrite'), s=tx.objectStore('kv'); var q=v===undefined?s.get(k):s.put(v,k); q.onsuccess=function(){ res(q.result); }; q.onerror=function(){ rej(q.error); }; }); }
+  function setBios(blob,name){ biosFile=new File([blob],'scph5501.bin'); st('bios-st','✓ '+name+' ('+Math.round(blob.size/1024)+' KB)'+(blob.size!==524288?' — ⚠️ ขนาดปกติของ BIOS คือ 512 KB':''),blob.size!==524288); ready(); }
+  kv('bios').then(function(r){ if(r&&r.blob) setBios(r.blob,r.name+' (จำไว้จากครั้งก่อน)'); }).catch(function(){});
+  $('bios-file').addEventListener('change',async function(e){ var f=e.target.files[0]; if(!f) return; var b=new Blob([await f.arrayBuffer()]); setBios(b,f.name); try{ await kv('bios',{blob:b,name:f.name}); }catch(_){ } });
+
+  // ---- เกม: ใช้ไฟล์ .bin ที่หน้าเล่นปกติแตกเก็บไว้ใน OPFS (ชื่อขึ้นต้น br2-) ----
+  (async function(){
+    try{
+      var root=await navigator.storage.getDirectory(), bins=[], cues=[];
+      for await (var [name,h] of root.entries()){ if(h.kind!=='file'||name.indexOf('br2-')!==0) continue; if(/\.bin$/i.test(name)) bins.push(h); else if(/\.cue$/i.test(name)) cues.push(name); }
+      if(!bins.length){ st('game-st','ไม่พบไฟล์เกมในเครื่องนี้ — เปิดเกมจากหน้าเล่นปกติ (ปุ่มดาวน์โหลดจากเซิร์ฟเวอร์) 1 ครั้งก่อน หรือเลือกไฟล์เองด้านล่าง',true); return; }
+      var files=await Promise.all(bins.map(function(h){ return h.getFile(); })); files.sort(function(a,b){ return b.size-a.size; });
+      gameFile=files[0];
+      st('game-st','✓ ใช้ไฟล์ที่โหลดไว้แล้ว: '+gameFile.name.replace(/^br2-/,'')+' ('+(gameFile.size/1048576).toFixed(0)+' MB)'+(files.length>1?'\n⚠️ พบ .bin '+files.length+' ไฟล์ ใช้ไฟล์ใหญ่สุด':''));
+      ready();
+    }catch(e){ st('game-st','อ่านไฟล์ที่เก็บไว้ไม่ได้ ('+(e.message||e)+') — เลือกไฟล์เองด้านล่าง',true); }
+  })();
+  $('game-file').addEventListener('change',function(e){ var f=e.target.files[0]; if(!f) return; gameFile=f; st('game-st','✓ '+f.name+' ('+(f.size/1048576).toFixed(0)+' MB)'); ready(); });
+
+  // ---- เริ่ม EmulatorJS + Beetle PSX HW (ไฟล์อยู่ในเว็บเราเองที่ hwtest/data) ----
+  $('go').addEventListener('click',function(){
+    if(!biosFile||!gameFile) return;
+    $('go').disabled=true; st('go-st','กำลังโหลด… (ไฟล์เกมทั้งก้อนต้องอ่านเข้าหน่วยความจำ อาจใช้เวลาครู่หนึ่ง)');
+    var res=$('res').value, pgxp=$('pgxp').checked;
+    window.EJS_player='#ejs';
+    window.EJS_core='mednafen_psx_hw';
+    window.EJS_pathtodata='hwtest/data/';
+    window.EJS_DEBUG_XX=true;              // ใช้ไฟล์ต้นฉบับ (ไม่มีไฟล์ย่อ .min)
+    window.EJS_gameUrl=gameFile;
+    window.EJS_biosUrl=biosFile;
+    window.EJS_gameName='br2-hwtest';
+    window.EJS_CacheLimit=0;               // ไม่ต้องก๊อปไฟล์เกมไปเก็บซ้ำ
+    window.EJS_startOnLoaded=true;
+    window.EJS_language='en-US'; window.EJS_disableAutoLang=true;
+    window.EJS_color='#e52b43';
+    window.EJS_defaultOptions={
+      'beetle_psx_hw_renderer':'hardware',
+      'beetle_psx_hw_internal_resolution':res,
+      'beetle_psx_hw_pgxp_mode':pgxp?'memory only':'disabled',
+      'beetle_psx_hw_pgxp_texture':pgxp?'enabled':'disabled',
+      'beetle_psx_hw_pgxp_vertex':pgxp?'enabled':'disabled',
+      'beetle_psx_hw_filter':'nearest',
+      'beetle_psx_hw_dither_mode':'internal resolution',
+      'beetle_psx_hw_skip_bios':'enabled'
+    };
+    window.EJS_onGameStart=function(){
+      $('setup').style.display='none'; $('fps').style.display='block';
+      var last=0, lastT=performance.now();
+      setInterval(function(){ try{ var gm=window.EJS_emulator&&window.EJS_emulator.gameManager; if(!gm) return; var f=gm.getFrameNum(), n=performance.now();
+        if(last) $('fps').textContent=Math.round((f-last)*1000/(n-lastT))+' fps · '+res+(pgxp?' · PGXP':''); last=f; lastT=n; }catch(_){ } },1000);
+    };
+    $('game').style.display='block';
+    var s=document.createElement('script'); s.src='hwtest/data/loader.js';
+    s.onerror=function(){ st('go-st','โหลดตัวจำลองไม่ได้',true); };
+    document.body.appendChild(s);
+  });
+})();
+</script>
+</body>
+</html>
