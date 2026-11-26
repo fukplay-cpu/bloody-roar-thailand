@@ -31,6 +31,10 @@
   #extra-menu[hidden]{display:none}
   #bar button.primary{background:var(--glow);color:#0a0a0a;border-color:var(--glow)}
   #btn-dot1.on,#btn-dot2.on,#btn-hd.on{background:#4c9df0;color:#06213d;border-color:#4c9df0}
+  #vol-wrap{display:inline-flex;align-items:center;gap:6px;padding:0 8px;border:1px solid #2a2a33;border-radius:8px;color:#ddd;font-size:12px;white-space:nowrap}
+  #vol-wrap[hidden]{display:none}
+  #vol{width:120px;accent-color:#c9a24b;cursor:pointer}
+  #vol-val{min-width:38px;text-align:right}
   #bar .spacer{flex:1} #bar .tag{font-size:.6rem;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;max-width:36vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #pad{position:fixed;left:0;right:0;bottom:0;z-index:16;display:none;pointer-events:none;--k:clamp(42px,13vw,60px);padding:.3rem max(.7rem,env(safe-area-inset-right)) max(.7rem,env(safe-area-inset-bottom)) max(.7rem,env(safe-area-inset-left))}
   #pad.show{display:block}
@@ -146,6 +150,7 @@
       <button data-act="pad">ปุ่มควบคุม</button>
       <button data-act="editpad">ปรับแต่งปุ่มควบคุม</button>
       <button data-act="hd" id="btn-hd" title="เพิ่มความละเอียดภายใน 2 เท่า ภาพ 3 มิติคมชัดขึ้น แต่อาจใช้ประสิทธิภาพเครื่องมากขึ้น (มีผลเมื่อเริ่มเกมครั้งถัดไป)">HD</button>
+      <label id="vol-wrap" hidden title="ปรับเสียงเกม (ซ้าย = เบา/ปิด · ขวา = ดัง)"><span id="vol-ico">🔊</span><input type="range" id="vol" min="0" max="200" step="5" value="100" aria-label="ระดับเสียงเกม"><span id="vol-val">100%</span></label>
       <button data-act="savecurrent" class="primary">บันทึก</button>
       <button data-act="resetgame" title="รีเฟรชตัวเกมโดยไม่โหลดหน้าเว็บใหม่ และคงการเชื่อมต่อออนไลน์ไว้">รีเฟรชเกม</button>
       <div id="extra-menu" hidden aria-label="เมนูเพิ่มเติม">
@@ -3547,6 +3552,37 @@ try {
     "use strict";
     var ASPECT=4/3;
     // ยืดภาพเต็มจอ (แบบแอป Gamma): จำค่าไว้ในเครื่อง ใช้ได้ทั้ง P1 และ P2
+    // ===== ระดับเสียงเกม (คอม): ส่งเสียงของตัวเกมผ่าน GainNode ก่อนออกลำโพง =====
+    // ไม่กระทบเสียงที่ส่งให้อีกเครื่องตอนเล่นออนไลน์ (ต่อแยกไปอีกทาง)
+    window.__br2Vol=1; try{ var _v=parseFloat(localStorage.getItem('br2_volume')); if(_v>=0&&_v<=2) window.__br2Vol=_v; }catch(_){ }
+    (function(){ try{
+      if(!window.AudioNode||AudioNode.prototype.__br2VolHooked) return;
+      var conn=AudioNode.prototype.connect;
+      AudioNode.prototype.connect=function(dest){
+        try{ var c=this.context;
+          if(c&&dest===c.destination&&this!==c.__br2Gain&&c.createGain){
+            if(!c.__br2Gain){ c.__br2Gain=c.createGain(); c.__br2Gain.gain.value=window.__br2Vol; conn.call(c.__br2Gain,c.destination); (window.__br2Gains=window.__br2Gains||[]).push(c.__br2Gain); }
+            var a=[].slice.call(arguments); a[0]=c.__br2Gain; return conn.apply(this,a); }
+        }catch(_){ }
+        return conn.apply(this,arguments); };
+      AudioNode.prototype.__br2VolHooked=true;
+    }catch(_){ } })();
+    window.__br2SetVolume=function(v){ v=Math.max(0,Math.min(2,+v||0)); window.__br2Vol=v;
+      (window.__br2Gains||[]).forEach(function(g){ try{ g.gain.setTargetAtTime(v,g.context.currentTime,0.02); }catch(_){ try{ g.gain.value=v; }catch(__){ } } });
+      try{ document.querySelectorAll('video').forEach(function(el){ el.volume=Math.min(1,v); }); }catch(_){ } // P2 ออนไลน์: เสียงมาจากวิดีโอ (สูงสุด 100%)
+      try{ localStorage.setItem('br2_volume',String(v)); }catch(_){ } };
+    (function(){ function init(){ var w=document.getElementById('vol-wrap'), r=document.getElementById('vol'), t=document.getElementById('vol-val'), ic=document.getElementById('vol-ico'); if(!w||!r) return;
+        var coarse=(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window);
+        if(coarse) return; // มือถือ/แท็บเล็ต: ใช้ปุ่มเสียงของเครื่อง
+        w.hidden=false; r.value=Math.round(window.__br2Vol*100);
+        function show(){ var p=+r.value; t.textContent=p+'%'; ic.textContent=p===0?'🔇':(p<50?'🔈':(p<=100?'🔉':'🔊')); }
+        show(); r.addEventListener('input',function(){ show(); window.__br2SetVolume(r.value/100); });
+        function back(){ try{ r.blur(); var c=document.getElementById('screen')||document.querySelector('canvas'); if(c) c.focus(); }catch(_){ } }
+        r.addEventListener('change',back); r.addEventListener('pointerup',function(){ setTimeout(back,0); });
+        ['keydown','keyup','keypress'].forEach(function(k){ r.addEventListener(k,function(e){ e.stopPropagation(); }); }); // ลูกศรบนแถบเสียงไม่ไปกดในเกม
+        setInterval(function(){ try{ document.querySelectorAll('video').forEach(function(el){ var want=Math.min(1,window.__br2Vol); if(Math.abs(el.volume-want)>0.01) el.volume=want; }); }catch(_){ } },1000);
+      }
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init(); })();
     window.__br2Fill=false; try{ window.__br2Fill=localStorage.getItem('br2_aspect')==='fill'; }catch(_){ }
     setTimeout(function(){ try{ br2AspectLabel(); }catch(_){ } },0);
     var BINDS={ input_player1_up:'up',input_player1_down:'down',input_player1_left:'left',input_player1_right:'right',
