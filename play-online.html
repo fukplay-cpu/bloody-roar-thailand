@@ -5186,7 +5186,8 @@ void main()
     function lnU16(S,o){ return S[o]|(S[o+1]<<8); }
     function lnB(S,o,w){ var p2=lnU16(S,o), p1=lnU16(S,o+LN_D); return w===1?(p2===0&&p1>0):(p1===0&&p2>0); }
     function lnCount(){ return LN.A?LN.A.o.length+LN.B.length:-1; }
-    function lnSave(){ try{ if(LN.A&&lnCount()<=4000) localStorage.setItem(LN_KEY,JSON.stringify({n1:LN.n1,n2:LN.n2,A:LN.A,B:LN.B})); }catch(_){ } }
+    // บันทึกแบบ B เสมอ (สำคัญที่สุด) · แบบ A บันทึกเฉพาะเมื่อเหลือไม่เกิน 4000 จุด
+    function lnSave(){ try{ if(LN.A&&LN.B.length<=20000) localStorage.setItem(LN_KEY,JSON.stringify({n1:LN.n1,n2:LN.n2,A:LN.A.o.length<=4000?LN.A:{o:[],v1:[],v2:[],dropped:LN.A.o.length},B:LN.B})); }catch(_){ } }
     function rkLearn(w,S){ if(!S) return; if(w===1) LN.n1++; else LN.n2++;
       if(!LN.A){
         if(!LN.pend||LN.pend.w===w){ LN.pend={w:w,S:S}; return; }
