@@ -4301,7 +4301,7 @@ void main()
       document.body.appendChild(b); }
     function rkDbg(){ var e=document.getElementById('rk-b2'); if(!e) return; var H=rpHeap(); if(!H||RP.base<0) return;
       var g=function(l){ return l.map(function(o){ return H[RP.base+o]; }).join(','); };
-      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']\n'+RK.hist.join(' → ')+'\nเรียนรู้: ชนะ '+LN.n1+' · แพ้ '+LN.n2+' · เหลือ '+(LN.A?lnCount():(LN.pend?'รออีกฝั่ง':'-'))+' จุด'+(RK.judge?' · ตัดสิน '+RK.judge:''); }
+      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']\n'+RK.hist.join(' → ')+'\nเรียนรู้: ชนะ '+LN.n1+' · แพ้ '+LN.n2+' · '+(LN.A?'A '+LN.A.o.length+' · B '+LN.B.length+(LN.B.length&&LN.B.length<=4?' ['+LN.B.map(function(o){ return o.toString(16); }).join(',')+']':''):(LN.pend?'รออีกฝั่ง':'-'))+(RK.judge?' · ตัดสิน '+RK.judge:''); }
     window.__br2RankedShow=function(d){ if(!d) return; rkBanner('🏆 '+(d.w===1?'P1':'P2')+' ชนะแมตช์','สกอร์ '+d.s1+' – '+d.s2+' · โหมดจัดอันดับ (ทดสอบ)'); };
     function rkTick(){
       if(!RK.on||!ng||window.__br2Viewer) return;
@@ -4342,10 +4342,11 @@ void main()
       }
       lnSave(); }
     // ตัดสินแมตช์ 2–2: ใช้ได้เมื่อเรียนรู้จากแมตช์ชนะ ≥2 และแพ้ ≥2 แล้ว
-    function rkJudge(S){ if(!S||!LN.A||LN.n1<2||LN.n2<2) return 0; var v1=0,v2=0, A=LN.A;
-      for(var i=0;i<A.o.length;i++){ var x=S[A.o[i]]; if(x===A.v1[i]) v1++; else if(x===A.v2[i]) v2++; }
-      LN.B.forEach(function(o){ if(lnB(S,o,1)) v1++; else if(lnB(S,o,2)) v2++; });
-      RK.judge=v1+':'+v2; if(v1+v2<1) return 0;
+    // ใช้แบบ B (คู่ค่า P1/P2 ที่ฝ่ายแพ้เป็น 0) ก่อน เพราะแม่นกว่า · แบบ A ใช้เมื่อเหลือไม่เกิน 500 จุดเท่านั้น
+    function rkJudge(S){ if(!S||!LN.A||LN.n1<2||LN.n2<2) return 0; var v1=0,v2=0, A=LN.A, use='';
+      if(LN.B.length>=1&&LN.B.length<=500){ use='B'; LN.B.forEach(function(o){ if(lnB(S,o,1)) v1++; else if(lnB(S,o,2)) v2++; }); }
+      else if(A.o.length>=1&&A.o.length<=500){ use='A'; for(var i=0;i<A.o.length;i++){ var x=S[A.o[i]]; if(x===A.v1[i]) v1++; else if(x===A.v2[i]) v2++; } }
+      RK.judge=(use||'-')+' '+v1+':'+v2; if(v1+v2<1) return 0;
       if(v1>=2*v2+1) return 1; if(v2>=2*v1+1) return 2; return 0; }
     window.__br2RankedLearn=function(){ return {n1:LN.n1,n2:LN.n2,left:lnCount(),pend:!!LN.pend,A:LN.A&&LN.A.o.length<=50?LN.A:null,B:LN.B&&LN.B.length<=50?LN.B:null}; };
     function rkEnd(){ var L=RK.lastValid, M1=RK.MATCH_POINT-1; if(!L||RK.done) return;
