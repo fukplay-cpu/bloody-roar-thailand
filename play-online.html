@@ -5149,7 +5149,7 @@ void main()
     function rkBadge(){ var b=document.getElementById('rk-badge'); if(b) return; b=document.createElement('div'); b.id='rk-badge';
       b.textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.cssText='position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:59;background:rgba(10,10,14,.8);border:1px solid #c9a24b;border-radius:999px;padding:3px 12px;color:#ffd27a;font:600 12px system-ui;pointer-events:none;white-space:nowrap';
-      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
+      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ v79) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.borderRadius='12px'; b.style.textAlign='center';
       // แตะป้าย = คัดลอกผลการเรียนรู้ (ส่งให้ Claude ดู)
       b.style.pointerEvents='auto'; b.style.cursor='pointer';
@@ -5187,7 +5187,7 @@ void main()
     function lnB(S,o,w){ var p2=lnU16(S,o), p1=lnU16(S,o+LN_D); return w===1?(p2===0&&p1>0):(p1===0&&p2>0); }
     function lnCount(){ return LN.A?LN.A.o.length+LN.B.length:-1; }
     // บันทึกแบบ B เสมอ (สำคัญที่สุด) · แบบ A บันทึกเฉพาะเมื่อเหลือไม่เกิน 4000 จุด
-    function lnSave(){ try{ if(LN.A&&LN.B.length<=20000) localStorage.setItem(LN_KEY,JSON.stringify({n1:LN.n1,n2:LN.n2,A:LN.A.o.length<=4000?LN.A:{o:[],v1:[],v2:[],dropped:LN.A.o.length},B:LN.B})); }catch(_){ } }
+    function lnSave(){ try{ if(LN.A&&LN.B.length<=150000) localStorage.setItem(LN_KEY,JSON.stringify({n1:LN.n1,n2:LN.n2,A:LN.A.o.length<=4000?LN.A:{o:[],v1:[],v2:[],dropped:LN.A.o.length},B:LN.B})); }catch(_){ } }
     function rkLearn(w,S){ if(!S) return; if(w===1) LN.n1++; else LN.n2++;
       if(!LN.A){
         if(!LN.pend||LN.pend.w===w){ LN.pend={w:w,S:S}; return; }
