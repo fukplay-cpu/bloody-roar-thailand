@@ -988,6 +988,8 @@ function launchFix6() {
     if (lastPlayers[1] && lastPlayers[1].name) gameURL.searchParams.set("n2", String(lastPlayers[1].name).slice(0, 20));
     // ชื่อล่าสุดในช่องของเครื่องนี้ (เปลี่ยนหลังเข้าห้องแล้วก็ยังใช้ได้) → ส่งให้อีกเครื่องตอนเริ่มเกม
     gameURL.searchParams.set("me", playerName());
+    // ทดสอบโหมดจัดอันดับ: เปิดหน้าห้องด้วย ?ranked=1 → ส่งต่อให้ตัวเกม
+    if (/[?&]ranked=1(&|$)/.test(location.search)) gameURL.searchParams.set("ranked", "1");
     if (idx >= 0) gameURL.searchParams.set("role", String(idx + 1));
   }
 
