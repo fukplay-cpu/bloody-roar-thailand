@@ -81,7 +81,7 @@ def patch_core(js):
         "if(!G.__br2GrabSeen){G.__br2GrabSeen=1;send({cmd:'br2frame',info:'grab hook running ('+(typeof WorkerGlobalScope!=='undefined'?'worker':'main')+')'})}"
         "var ctx=GL.currentContext&&GL.currentContext.GLctx,c=ctx&&ctx.canvas;if(!c||!c.width){if(!G.__br2GrabNoCtx){G.__br2GrabNoCtx=1;send({cmd:'br2frame',info:'no GL canvas: ctx='+!!ctx+' canvas='+!!c})}return}"
         "G.__br2GrabBusy=true;var w=G.__br2GrabW||640,h=Math.round(w*c.height/c.width)||480,p;"
-        "try{p=createImageBitmap(c,{resizeWidth:w,resizeHeight:h,resizeQuality:'low'})}catch(e){try{p=createImageBitmap(c)}catch(e2){G.__br2GrabBusy=false;if(!G.__br2GrabErr){G.__br2GrabErr=1;send({cmd:'br2frame',err:String(e2)})}return}}"
+        "try{p=createImageBitmap(c,{resizeWidth:w,resizeHeight:h,resizeQuality:'medium'})}catch(e){try{p=createImageBitmap(c)}catch(e2){G.__br2GrabBusy=false;if(!G.__br2GrabErr){G.__br2GrabErr=1;send({cmd:'br2frame',err:String(e2)})}return}}"
         "p.then(function(b){G.__br2GrabBusy=false;send({cmd:'br2frame',bmp:b},[b])},"
         "function(e){G.__br2GrabBusy=false;if(!G.__br2GrabErr){G.__br2GrabErr=1;send({cmd:'br2frame',err:String(e)})}})"
     )

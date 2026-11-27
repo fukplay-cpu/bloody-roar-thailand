@@ -4,7 +4,7 @@
     // การนัดเชื่อมต่อ (SDP) ส่งผ่าน Worker ห้องเดิม — ข้อความละไม่เกิน 2048 ตัวอักษร จึงแบ่งเป็นชิ้น
     var ST={on:false,hint:0,pc:null,dc:null,video:null,media:null,audioDest:null,sig:{},sigTimer:null,
       lastBits:-1,lastSend:0,seq:0,remoteSeq:-1,remoteBits:0,conn:'',route:'',rtt:0,fps:0,frames:0,
-      tapNeeded:false,capW:480,inCount:0,outCount:0,helloTimer:null,cv:null,raf:0,useDirect:false,connectStarted:0,
+      tapNeeded:false,capW:640,inCount:0,outCount:0,helloTimer:null,cv:null,raf:0,useDirect:false,connectStarted:0,
       ice:[{urls:['stun:stun.cloudflare.com:3478','stun:stun.l.google.com:19302']}]};
     (function(){
       try{
@@ -174,7 +174,7 @@
       var ms=stHostMedia(), pc=stNewPc();
       ms.getTracks().forEach(function(t){ var snd=pc.addTrack(t,ms);
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
-          try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=1500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
+          try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=3500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
       var dc=pc.createDataChannel('in',{ordered:false,maxRetransmits:0}); ST.dc=dc;
       dc.onmessage=function(e){ try{ var d=JSON.parse(e.data); if(ST.peerAway) stPeerAway(false,2); if(d&&d.t==='sm') stOnMacro(d); else stOnInput(d); }catch(_){ } };
       var offer=await pc.createOffer(); await pc.setLocalDescription(offer);
