@@ -5154,7 +5154,7 @@ void main()
       document.body.appendChild(b); }
     function rkDbg(){ var e=document.getElementById('rk-b2'); if(!e) return; var H=rpHeap(); if(!H||RP.base<0) return;
       var g=function(l){ return l.map(function(o){ return H[RP.base+o]; }).join(','); };
-      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']\n'+RK.hist.join(' → ')+'\nค่าผู้ชนะ '+(RK.wLast?RK.wLast.join(''):'-')+' · ตรงทุกครั้ง '+rkWGood().length+'/'+RK.WC.length+' ตัว จาก '+RK.wStat.n+' แมตช์'; }
+      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']\n'+RK.hist.join(' → ')+'\nเรียนรู้: ชนะ '+LN.n1+' · แพ้ '+LN.n2+' · เหลือ '+(LN.A?lnCount():(LN.pend?'รออีกฝั่ง':'-'))+' จุด'+(RK.judge?' · ตัดสิน '+RK.judge:''); }
     window.__br2RankedShow=function(d){ if(!d) return; rkBanner('🏆 '+(d.w===1?'P1':'P2')+' ชนะแมตช์','สกอร์ '+d.s1+' – '+d.s2+' · โหมดจัดอันดับ (ทดสอบ)'); };
     function rkTick(){
       if(!RK.on||!ng||window.__br2Viewer) return;
@@ -5170,24 +5170,45 @@ void main()
       RK.result=res; try{ log('🏆 จบแมตช์: '+(w===1?'P1':'P2')+' ชนะ '+a+'–'+b,'ok'); }catch(_){ }
       window.__br2RankedShow(res);
       try{ if(typeof window.__br2RankedSend==='function') window.__br2RankedSend(res); }catch(_){ } }
-    // ค่าที่น่าจะบอก "ผู้ชนะแมตช์" (P1 ชนะ = 0, P2 ชนะ = 1) จากการเก็บค่าตอน YOU WIN · 27 พ.ย.
-    RK.WC=[207443,207483,229587,229699,229923,230363,230811,232827,233723,234227,234451,234563];
-    RK.wStat=(function(){ try{ var o=JSON.parse(localStorage.getItem('br2_rk_wstat')||'null'); if(o&&o.h&&o.h.length===RK.WC.length) return o; }catch(_){ } return {n:0,h:RK.WC.map(function(){ return 0; })}; })();
-    function rkWRead(){ var H=rpHeap(); if(!H||RP.base<0) return null; return RK.WC.map(function(o){ return H[RP.base+o]; }); }
-    function rkWGood(){ var S=RK.wStat, g=[]; for(var i=0;i<RK.WC.length;i++) if(S.n>0&&S.h[i]===S.n) g.push(i); return g; }
-    function rkWLearn(w){ var W=RK.wLast; if(!W) return; var S=RK.wStat; S.n++;
-      for(var i=0;i<W.length;i++) if(W[i]===w-1) S.h[i]++;
-      try{ localStorage.setItem('br2_rk_wstat',JSON.stringify(S)); }catch(_){ } }
+    // ===== เรียนรู้ "ใครชนะยกสุดท้าย" เองจากแมตช์ที่รู้ผลแน่นอน (3–0, 3–1, 0–3, 1–3) =====
+    // เก็บภาพ RAM ทั้งหมดทุก 0.5 วินาทีระหว่างที่สกอร์ยังอ่านได้ (ภาพสุดท้ายคือช่วง YOU WIN / YOU LOSE)
+    // แบบ A: ไบต์ที่ P1 ชนะเป็นค่าเดิมเสมอ และ P2 ชนะเป็นอีกค่าเสมอ
+    // แบบ B: คู่ค่า 16 บิตของ P2 / P1 (ห่างกัน 0x108 เหมือนตัวนับยก) ที่ฝ่ายแพ้เป็น 0 ฝ่ายชนะมากกว่า 0 (เช่น พลังชีวิต)
+    var LN={n1:0,n2:0,pend:null,A:null,B:null}, LN_KEY='br2_rk_learn2', LN_D=0x108;
+    try{ var _l=JSON.parse(localStorage.getItem(LN_KEY)||'null'); if(_l&&_l.A) LN=_l; }catch(_){ }
+    var LN_EXC={}; RK.P1W.concat(RK.P2W).forEach(function(o){ LN_EXC[o]=LN_EXC[o+1]=1; });
+    function lnU16(S,o){ return S[o]|(S[o+1]<<8); }
+    function lnB(S,o,w){ var p2=lnU16(S,o), p1=lnU16(S,o+LN_D); return w===1?(p2===0&&p1>0):(p1===0&&p2>0); }
+    function lnCount(){ return LN.A?LN.A.o.length+LN.B.length:-1; }
+    function lnSave(){ try{ if(LN.A&&lnCount()<=4000) localStorage.setItem(LN_KEY,JSON.stringify({n1:LN.n1,n2:LN.n2,A:LN.A,B:LN.B})); }catch(_){ } }
+    function rkLearn(w,S){ if(!S) return; if(w===1) LN.n1++; else LN.n2++;
+      if(!LN.A){
+        if(!LN.pend||LN.pend.w===w){ LN.pend={w:w,S:S}; return; }
+        var S1=w===1?S:LN.pend.S, S2=w===1?LN.pend.S:S, ao=[], a1=[], a2=[], bo=[], o;
+        for(o=0;o<S1.length;o++){ if(S1[o]!==S2[o]&&!LN_EXC[o]){ ao.push(o); a1.push(S1[o]); a2.push(S2[o]); } }
+        for(o=0;o+LN_D+1<S1.length;o+=2){ if(lnB(S1,o,1)&&lnB(S2,o,2)) bo.push(o); }
+        LN.A={o:ao,v1:a1,v2:a2}; LN.B=bo; LN.pend=null;
+      } else {
+        var A=LN.A, no=[], n1=[], n2=[];
+        for(var i=0;i<A.o.length;i++){ if(S[A.o[i]]===(w===1?A.v1[i]:A.v2[i])){ no.push(A.o[i]); n1.push(A.v1[i]); n2.push(A.v2[i]); } }
+        LN.A={o:no,v1:n1,v2:n2}; LN.B=LN.B.filter(function(o){ return lnB(S,o,w); });
+      }
+      lnSave(); }
+    // ตัดสินแมตช์ 2–2: ใช้ได้เมื่อเรียนรู้จากแมตช์ชนะ ≥2 และแพ้ ≥2 แล้ว
+    function rkJudge(S){ if(!S||!LN.A||LN.n1<2||LN.n2<2) return 0; var v1=0,v2=0, A=LN.A;
+      for(var i=0;i<A.o.length;i++){ var x=S[A.o[i]]; if(x===A.v1[i]) v1++; else if(x===A.v2[i]) v2++; }
+      LN.B.forEach(function(o){ if(lnB(S,o,1)) v1++; else if(lnB(S,o,2)) v2++; });
+      RK.judge=v1+':'+v2; if(v1+v2<1) return 0;
+      if(v1>=2*v2+1) return 1; if(v2>=2*v1+1) return 2; return 0; }
+    window.__br2RankedLearn=function(){ return {n1:LN.n1,n2:LN.n2,left:lnCount(),pend:!!LN.pend,A:LN.A&&LN.A.o.length<=50?LN.A:null,B:LN.B&&LN.B.length<=50?LN.B:null}; };
     function rkEnd(){ var L=RK.lastValid, M1=RK.MATCH_POINT-1; if(!L||RK.done) return;
       var p1=L.a===M1, p2=L.b===M1;
-      if(p1&&!p2){ rkWLearn(1); rkDeclare(1,L.a+1,L.b); }
-      else if(p2&&!p1){ rkWLearn(2); rkDeclare(2,L.a,L.b+1); }
+      if(p1&&!p2){ rkLearn(1,RK.snap); rkDeclare(1,L.a+1,L.b); }
+      else if(p2&&!p1){ rkLearn(2,RK.snap); rkDeclare(2,L.a,L.b+1); }
       else if(p1&&p2){
-        // 2–2: ใช้ค่าผู้ชนะ (เฉพาะตัวที่ตรงทุกแมตช์ที่ผ่านมา ถ้ายังไม่มีก็ใช้ทุกตัว) ต้องเสียงข้างมากชัดเจน
-        var W=RK.wLast, g=rkWGood(); if(!g.length) g=RK.WC.map(function(_,i){ return i; });
-        var c0=0,c1=0; if(W) g.forEach(function(i){ if(W[i]===0) c0++; else if(W[i]===1) c1++; });
-        if(c0>=2*c1+1&&c0>=Math.ceil(g.length/2)) rkDeclare(1,L.a+1,L.b,'w');
-        else if(c1>=2*c0+1&&c1>=Math.ceil(g.length/2)) rkDeclare(2,L.a,L.b+1,'w');
+        var jw=rkJudge(RK.snap);
+        if(jw===1) rkDeclare(1,L.a+1,L.b,'learn');
+        else if(jw===2) rkDeclare(2,L.a,L.b+1,'learn');
         else { RK.done=true; try{ log('จบแมตช์ที่ '+M1+'–'+M1+' แต่ยังบอกไม่ได้ว่าใครชนะยกสุดท้าย','err'); }catch(_){ }
           rkBanner('🏁 จบแมตช์ '+M1+'–'+M1,'ยกสุดท้ายยังตัดสินไม่ได้'); } } }
     // ระหว่างยก ค่าจะเพี้ยนชั่วคราว (✕) → ไม่ใช่จบแมตช์
@@ -5197,16 +5218,16 @@ void main()
       if(!RK.on||!RK.applied||window.__br2Viewer) return;
       var a=rkWins(RK.P1W), b=rkWins(RK.P2W), MP=RK.MATCH_POINT;
       var ok=a!==null&&b!==null&&a<=MP&&b<=MP, key=ok?a+'-'+b:'✕', now=Date.now();
-      if(ok){ RK.xSince=0; RK.wLast=rkWRead(); } else if(!RK.xSince) RK.xSince=now;
+      if(ok){ RK.xSince=0; } else if(!RK.xSince) RK.xSince=now;
       if(!ok&&RK.xSince&&now-RK.xSince>10000&&RK.lastValid&&(RK.lastValid.a||RK.lastValid.b)){ rkEnd(); RK.lastValid=null; }
-      if(key===RK.cur) return; RK.cur=key; RK.hist.push(key); if(RK.hist.length>9) RK.hist.shift();
+      if(key===RK.cur){ if(ok&&now-(RK.snapT||0)>500){ RK.snap=rpHeap().slice(RP.base,RP.base+0x200000); RK.snapT=now; } return; } RK.cur=key; RK.hist.push(key); if(RK.hist.length>9) RK.hist.shift();
       if(!ok) return;
       if(a===0&&b===0){ if(RK.lastValid&&(RK.lastValid.a||RK.lastValid.b)) rkEnd(); RK.done=false; RK.lastValid={a:0,b:0}; return; }
       if(!RK.done&&(a>=MP||b>=MP)){ rkDeclare(a>=MP?1:2,a,b); }
       RK.lastValid={a:a,b:b};
     }
     if(RK.on){ setInterval(rkScore,100); setInterval(rkTick,500); setInterval(function(){ if(RK.on&&!window.__br2Viewer) rkApply(); },100); }
-    window.__br2Ranked=function(){ return {on:RK.on,applied:RK.applied,score:RK.cur,hist:RK.hist,result:RK.result||null,lock:RK.LOCK,wstat:RK.wStat,wgood:rkWGood()}; };
+    window.__br2Ranked=function(){ return {on:RK.on,applied:RK.applied,score:RK.cur,hist:RK.hist,result:RK.result||null,lock:RK.LOCK,learn:window.__br2RankedLearn()}; };
 
     // ===== ตัวนับเฟรมของเกม: ตัวเกมอ่านจอยผ่าน navigator.getGamepads() ครั้งเดียวต่อ 1 เฟรม (บนเธรดหลัก) =====
     var br2Frame=0, br2FrameT=0, br2FrameHooks=[], br2FramePending=false;
