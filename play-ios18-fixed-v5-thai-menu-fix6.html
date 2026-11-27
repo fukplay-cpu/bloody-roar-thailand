@@ -4281,14 +4281,11 @@ void main()
     var RK={on:/[?&]ranked=1(&|$)/.test(location.search), applied:false, last:null, done:false, matchNo:0};
     RK.MATCH_POINT=3; RK.TIME_IDX=2; RK.ATTACK=1; // 3 ยก · 60 วินาที · ดาเมจ 1
     // ตำแหน่ง RAM (USA) จากการทดสอบ 27 พ.ย.
-    RK.CODE=['301C0FAD 00'+('0'+(RK.MATCH_POINT-1)).slice(-2),'301C0FAE 00'+('0'+(RK.MATCH_POINT-1)).slice(-2),'301C0FB0 00'+('0'+(RK.ATTACK-1)).slice(-2),'301C0FB1 00'+('0'+RK.TIME_IDX).slice(-2)].join('+');
     RK.P1W=[0x1C5E20,0x1C817C,0x1CA4D8,0x1CC834]; RK.P2W=[0x1C5D18,0x1C8074,0x1CA3D0,0x1CC72C];
-    function rkApply(){
-      var M=ng&&ng.getEmscriptenModule&&ng.getEmscriptenModule(); if(!M||!M._cmd_cheat_set_code) return false;
-      try{ var H=rpHeap(), p=RK.ptr||(RK.ptr=M._malloc(256)); H=rpHeap();
-        for(var i=0;i<RK.CODE.length;i++) H[p+i]=RK.CODE.charCodeAt(i); H[p+RK.CODE.length]=0;
-        M._cmd_cheat_realloc(1); M._cmd_cheat_set_code(0,p); M._cmd_cheat_toggle_index(1,0); M._cmd_cheat_apply_cheats(); return true; }catch(e){ try{ log('ล็อกการตั้งค่าไม่สำเร็จ: '+e,'err'); }catch(_){ } return false; }
-    }
+    // เขียนค่าลง RAM ตรง ๆ ทุก 100ms (แทนระบบสูตร ซึ่งสลับเปิด/ปิดตัวเองทุกครั้งที่เรียกซ้ำ)
+    RK.LOCK=[[0x1C0FAD,RK.MATCH_POINT-1],[0x1C0FAE,RK.MATCH_POINT-1],[0x1C0FB0,RK.ATTACK-1],[0x1C0FB1,RK.TIME_IDX]];
+    function rkApply(){ var H=rpHeap(); if(!H||RP.base<0) return false;
+      for(var i=0;i<RK.LOCK.length;i++){ var a=RP.base+RK.LOCK[i][0]; if(H[a]!==RK.LOCK[i][1]) H[a]=RK.LOCK[i][1]; } return true; }
     function rkWins(list){ var H=rpHeap(); if(!H||RP.base<0) return null; var c={}, best=null, bc=0;
       list.forEach(function(o){ var v=H[RP.base+o]; c[v]=(c[v]||0)+1; if(c[v]>bc){ bc=c[v]; best=v; } }); return bc>=3?best:null; } // ต้องตรงกันอย่างน้อย 3 จาก 4 ชุด
     function rkBanner(t,sub){ var b=document.getElementById('rk-banner'); if(!b){ b=document.createElement('div'); b.id='rk-banner';
@@ -4299,12 +4296,18 @@ void main()
     function rkBadge(){ var b=document.getElementById('rk-badge'); if(b) return; b=document.createElement('div'); b.id='rk-badge';
       b.textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.cssText='position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:59;background:rgba(10,10,14,.8);border:1px solid #c9a24b;border-radius:999px;padding:3px 12px;color:#ffd27a;font:600 12px system-ui;pointer-events:none;white-space:nowrap';
+      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
+      b.style.borderRadius='12px'; b.style.textAlign='center';
       document.body.appendChild(b); }
+    function rkDbg(){ var e=document.getElementById('rk-b2'); if(!e) return; var H=rpHeap(); if(!H||RP.base<0) return;
+      var g=function(l){ return l.map(function(o){ return H[RP.base+o]; }).join(','); };
+      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']'; }
     window.__br2RankedShow=function(d){ if(!d) return; rkBanner('🏆 '+(d.w===1?'P1':'P2')+' ชนะแมตช์','สกอร์ '+d.s1+' – '+d.s2+' · โหมดจัดอันดับ (ทดสอบ)'); };
     function rkTick(){
       if(!RK.on||!ng||window.__br2Viewer) return;
       br2FightPoll(); if(RP.base<0) return;
-      if(!RK.applied||Date.now()-(RK.appliedAt||0)>5000){ if(rkApply()){ if(!RK.applied){ try{ log('🏅 โหมดจัดอันดับ (ทดสอบ): ล็อก '+RK.MATCH_POINT+' ยก · 60 วินาที · ดาเมจ '+RK.ATTACK,'ok'); }catch(_){ } } RK.applied=true; RK.appliedAt=Date.now(); rkBadge(); } }
+      if(rkApply()&&!RK.applied){ RK.applied=true; try{ log('🏅 โหมดจัดอันดับ (ทดสอบ): ล็อก '+RK.MATCH_POINT+' ยก · 60 วินาที · ดาเมจ '+RK.ATTACK,'ok'); }catch(_){ } rkBadge(); }
+      rkDbg();
       var a=rkWins(RK.P1W), b=rkWins(RK.P2W); if(a===null||b===null) return;
       var key=a+'-'+b;
       if(key!==RK.last){
@@ -4319,8 +4322,8 @@ void main()
         } else if(a===0&&b===0){ RK.done=false; } // แมตช์ใหม่
       }
     }
-    if(RK.on){ setInterval(rkTick,500); }
-    window.__br2Ranked=function(){ return {on:RK.on,applied:RK.applied,score:RK.last,result:RK.result||null,code:RK.code=RK.CODE}; };
+    if(RK.on){ setInterval(rkTick,500); setInterval(function(){ if(RK.on&&!window.__br2Viewer) rkApply(); },100); }
+    window.__br2Ranked=function(){ return {on:RK.on,applied:RK.applied,score:RK.last,result:RK.result||null,lock:RK.LOCK}; };
 
     // ===== ตัวนับเฟรมของเกม: ตัวเกมอ่านจอยผ่าน navigator.getGamepads() ครั้งเดียวต่อ 1 เฟรม (บนเธรดหลัก) =====
     var br2Frame=0, br2FrameT=0, br2FrameHooks=[], br2FramePending=false;
