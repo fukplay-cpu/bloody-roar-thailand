@@ -74,6 +74,9 @@ def patch_core(js):
     #     to the page as an ImageBitmap.
     grab = (
         "var G=globalThis;if(G.__br2GrabBusy)return;"
+        # cap grabs at ~60/s: on 120-165Hz monitors the main loop runs at the monitor rate and grabbed
+        # every iteration (165 copies/s), wasting GPU readback + encoder work on duplicate frames
+        "var T=performance.now(),N=G.__br2GrabN||0;if(T<N-4)return;G.__br2GrabN=(T-N>50?T:N)+16.67;"
         "var send=function(m,t){if(typeof WorkerGlobalScope!=='undefined')postMessage(m,t||[]);else if(G.__br2Deliver)G.__br2Deliver(m)};"
         "if(!G.__br2GrabSeen){G.__br2GrabSeen=1;send({cmd:'br2frame',info:'grab hook running ('+(typeof WorkerGlobalScope!=='undefined'?'worker':'main')+')'})}"
         "var ctx=GL.currentContext&&GL.currentContext.GLctx,c=ctx&&ctx.canvas;if(!c||!c.width){if(!G.__br2GrabNoCtx){G.__br2GrabNoCtx=1;send({cmd:'br2frame',info:'no GL canvas: ctx='+!!ctx+' canvas='+!!c})}return}"
