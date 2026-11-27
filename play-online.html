@@ -5149,7 +5149,7 @@ void main()
     function rkBadge(){ var b=document.getElementById('rk-badge'); if(b) return; b=document.createElement('div'); b.id='rk-badge';
       b.textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.cssText='position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:59;background:rgba(10,10,14,.8);border:1px solid #c9a24b;border-radius:999px;padding:3px 12px;color:#ffd27a;font:600 12px system-ui;pointer-events:none;white-space:nowrap';
-      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ v79) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
+      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ v80) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.borderRadius='12px'; b.style.textAlign='center';
       // แตะป้าย = คัดลอกผลการเรียนรู้ (ส่งให้ Claude ดู)
       b.style.pointerEvents='auto'; b.style.cursor='pointer';
@@ -5160,7 +5160,7 @@ void main()
       document.body.appendChild(b); }
     function rkDbg(){ var e=document.getElementById('rk-b2'); if(!e) return; var H=rpHeap(); if(!H||RP.base<0) return;
       var g=function(l){ return l.map(function(o){ return H[RP.base+o]; }).join(','); };
-      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']\n'+RK.hist.join(' → ')+'\nเรียนรู้: ชนะ '+LN.n1+' · แพ้ '+LN.n2+' · '+(LN.A?'A '+LN.A.o.length+' · B '+LN.B.length+(LN.B.length&&LN.B.length<=4?' ['+LN.B.map(function(o){ return o.toString(16); }).join(',')+']':''):(LN.pend?'รออีกฝั่ง':'-'))+(RK.judge?' · ตัดสิน '+RK.judge:''); }
+      e.textContent='ตั้งค่า '+RK.LOCK.map(function(x){ return H[RP.base+x[0]]; }).join(',')+' · P1['+g(RK.P1W)+'] P2['+g(RK.P2W)+']\n'+RK.hist.join(' → ')+'\nเรียนรู้: ชนะ '+LN.n1+' · แพ้ '+LN.n2+' · '+(LN.A?'A '+LN.A.o.length+' · B '+LN.B.length+(LN.B.length&&LN.B.length<=4?' ['+LN.B.map(function(o){ return o.toString(16); }).join(',')+']':''):(LN.pend?'รออีกฝั่ง':'-'))+(RK.judge?' · ตัดสิน '+RK.judge:'')+(RK.live?' · สด '+RK.live[0]+':'+RK.live[1]:''); }
     window.__br2RankedShow=function(d){ if(!d) return; rkBanner('🏆 '+(d.w===1?'P1':'P2')+' ชนะแมตช์','สกอร์ '+d.s1+' – '+d.s2+' · โหมดจัดอันดับ (ทดสอบ)'); };
     function rkTick(){
       if(!RK.on||!ng||window.__br2Viewer) return;
@@ -5203,11 +5203,13 @@ void main()
       lnSave(); }
     // ตัดสินแมตช์ 2–2: ใช้ได้เมื่อเรียนรู้จากแมตช์ชนะ ≥2 และแพ้ ≥2 แล้ว
     // ใช้แบบ B (คู่ค่า P1/P2 ที่ฝ่ายแพ้เป็น 0) ก่อน เพราะแม่นกว่า · แบบ A ใช้เมื่อเหลือไม่เกิน 500 จุดเท่านั้น
-    function rkJudge(S){ if(!S||!LN.A||LN.n1<2||LN.n2<2) return 0; var v1=0,v2=0, A=LN.A, use='';
-      if(LN.B.length>=1&&LN.B.length<=20000){ use='B'; LN.B.forEach(function(o){ if(lnB(S,o,1)) v1++; else if(lnB(S,o,2)) v2++; }); }
-      else if(A.o.length>=1&&A.o.length<=500){ use='A'; for(var i=0;i<A.o.length;i++){ var x=S[A.o[i]]; if(x===A.v1[i]) v1++; else if(x===A.v2[i]) v2++; } }
-      RK.judge=(use||'-')+' '+v1+':'+v2; if(v1+v2<1) return 0;
-      if(v1>=2*v2+1) return 1; if(v2>=2*v1+1) return 2; return 0; }
+    // ===== ค่าที่ได้จากการเรียนรู้จริง 27 พ.ย. (ชนะ 4 · แพ้ 4 · ตัดสิน 2–2 ถูก 68:0 และ 1:65) =====
+    // คู่ค่า 16 บิต ตำแหน่ง o = ฝั่ง P2, o+0x108 = ฝั่ง P1 · ฝ่ายแพ้เป็น 0 ฝ่ายชนะมากกว่า 0
+    RK.HPB=[66086,66128,66134,66144,66150,66710,67062,67850,67860,68020,68588,68968,70120,70122,70124,70130,70136,70138,70142,70144,70146,70150,70154,70160,70162,70170,70176,70178,70186,77064,79184,79186,79194,98576,99344,99360,123498,124896,141894,171096,171100,171122,184348,185856,185860,185870,189712,222882,225000,225032,272860,279174,280528,280672,280720,280864,281104,281296,602764,617514,649978,1889084,1894910,1895012,1895288,1972548,2096278,2096362,2096502];
+    function rkVoteOn(S,base){ var v1=0,v2=0; RK.HPB.forEach(function(o){ var q=base+o, p2=S[q]|(S[q+1]<<8), p1=S[q+LN_D]|(S[q+LN_D+1]<<8);
+        if(p2===0&&p1>0) v1++; else if(p1===0&&p2>0) v2++; }); return [v1,v2]; }
+    function rkVoteWin(v){ var need=Math.ceil(RK.HPB.length*2/3); return (v[0]>=need&&v[1]<=3)?1:(v[1]>=need&&v[0]<=3)?2:0; }
+    function rkJudge(S){ if(!S) return 0; var v=rkVoteOn(S,0); RK.judge='HP '+v[0]+':'+v[1]; return rkVoteWin(v); }
     window.__br2RankedLearn=function(){ return {n1:LN.n1,n2:LN.n2,left:lnCount(),pend:!!LN.pend,A:LN.A&&LN.A.o.length<=50?LN.A:null,B:LN.B&&LN.B.length<=50?LN.B:null}; };
     function rkEnd(){ var L=RK.lastValid, M1=RK.MATCH_POINT-1; if(!L||RK.done) return;
       var p1=L.a===M1, p2=L.b===M1;
@@ -5228,6 +5230,10 @@ void main()
       var ok=a!==null&&b!==null&&a<=MP&&b<=MP, key=ok?a+'-'+b:'✕', now=Date.now();
       if(ok){ RK.xSince=0; } else if(!RK.xSince) RK.xSince=now;
       if(!ok&&RK.xSince&&now-RK.xSince>10000&&RK.lastValid&&(RK.lastValid.a||RK.lastValid.b)){ rkEnd(); RK.lastValid=null; }
+      if(ok&&!RK.done){ var H0=rpHeap(), vv=rkVoteOn(H0,RP.base), vw=rkVoteWin(vv); RK.live=vv;
+        var M1=MP-1, atM1=(vw===1&&a===M1)||(vw===2&&b===M1);
+        if(atM1){ if(RK.vw!==vw){ RK.vw=vw; RK.vt=now; } else if(now-RK.vt>=1000){ RK.judge='HP '+vv[0]+':'+vv[1]+' (ทันที)'; if(vw===1) rkDeclare(1,a+1,b,'hp'); else rkDeclare(2,a,b+1,'hp'); } }
+        else RK.vw=0; }
       if(key===RK.cur){ if(ok&&now-(RK.snapT||0)>500){ RK.snap=rpHeap().slice(RP.base,RP.base+0x200000); RK.snapT=now; } return; } RK.cur=key; RK.hist.push(key); if(RK.hist.length>9) RK.hist.shift();
       if(!ok) return;
       if(a===0&&b===0){ if(RK.lastValid&&(RK.lastValid.a||RK.lastValid.b)) rkEnd(); RK.done=false; RK.lastValid={a:0,b:0}; return; }
