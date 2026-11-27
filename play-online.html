@@ -5149,11 +5149,15 @@ void main()
         document.body.appendChild(b); }
       b.innerHTML=t+(sub?'<div style="font:500 13px system-ui;color:#ddd;margin-top:4px">'+sub+'</div>':''); b.style.display='block';
       clearTimeout(RK.bt); RK.bt=setTimeout(function(){ b.style.display='none'; },6000); }
+    function rkBadge(){ var b=document.getElementById('rk-badge'); if(b) return; b=document.createElement('div'); b.id='rk-badge';
+      b.textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
+      b.style.cssText='position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:59;background:rgba(10,10,14,.8);border:1px solid #c9a24b;border-radius:999px;padding:3px 12px;color:#ffd27a;font:600 12px system-ui;pointer-events:none;white-space:nowrap';
+      document.body.appendChild(b); }
     window.__br2RankedShow=function(d){ if(!d) return; rkBanner('🏆 '+(d.w===1?'P1':'P2')+' ชนะแมตช์','สกอร์ '+d.s1+' – '+d.s2+' · โหมดจัดอันดับ (ทดสอบ)'); };
     function rkTick(){
       if(!RK.on||!ng||window.__br2Viewer) return;
       br2FightPoll(); if(RP.base<0) return;
-      if(!RK.applied||Date.now()-(RK.appliedAt||0)>5000){ if(rkApply()){ if(!RK.applied){ try{ log('🏅 โหมดจัดอันดับ (ทดสอบ): ล็อก '+RK.MATCH_POINT+' ยก · 60 วินาที · ดาเมจ '+RK.ATTACK,'ok'); }catch(_){ } } RK.applied=true; RK.appliedAt=Date.now(); } }
+      if(!RK.applied||Date.now()-(RK.appliedAt||0)>5000){ if(rkApply()){ if(!RK.applied){ try{ log('🏅 โหมดจัดอันดับ (ทดสอบ): ล็อก '+RK.MATCH_POINT+' ยก · 60 วินาที · ดาเมจ '+RK.ATTACK,'ok'); }catch(_){ } } RK.applied=true; RK.appliedAt=Date.now(); rkBadge(); } }
       var a=rkWins(RK.P1W), b=rkWins(RK.P2W); if(a===null||b===null) return;
       var key=a+'-'+b;
       if(key!==RK.last){
