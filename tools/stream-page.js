@@ -175,6 +175,9 @@
       await stLoadTurn();
       var ms=stHostMedia(), pc=stNewPc();
       ms.getTracks().forEach(function(t){ var snd=pc.addTrack(t,ms);
+        // วิดีโอ: ให้ H.264 มาก่อน (คอม/มือถือส่วนใหญ่เข้ารหัส-ถอดรหัสด้วยฮาร์ดแวร์ได้ → CPU ไม่ตันจนส่งภาพตก) · ถ้าไม่มีก็ใช้แบบเดิม
+        if(t.kind==='video'){ try{ var tr=pc.getTransceivers().filter(function(x){ return x.sender===snd; })[0], caps=RTCRtpSender.getCapabilities&&RTCRtpSender.getCapabilities('video');
+          if(tr&&tr.setCodecPreferences&&caps&&caps.codecs){ var h=caps.codecs.filter(function(c){ return /h264/i.test(c.mimeType); }), o=caps.codecs.filter(function(c){ return !/h264/i.test(c.mimeType); }); if(h.length) tr.setCodecPreferences(h.concat(o)); } }catch(_){ } }
         if(t.kind==='video'){ try{ t.contentHint='motion'; }catch(_){ }
           try{ var p=snd.getParameters(); p.degradationPreference='maintain-framerate'; if(!p.encodings||!p.encodings.length) p.encodings=[{}]; p.encodings[0].maxBitrate=3500000; p.encodings[0].maxFramerate=60; snd.setParameters(p).catch(function(){}); }catch(_){ } } });
       var dc=pc.createDataChannel('in',{ordered:false,maxRetransmits:0}); ST.dc=dc;
@@ -381,7 +384,7 @@
             // ความหน่วงของบัฟเฟอร์ภาพ (เฉลี่ยช่วง 1 วินาทีล่าสุด)
             var jd=(s.jitterBufferDelay||0)-(ST.lastJbd||0), je=(s.jitterBufferEmittedCount||0)-(ST.lastJbe||0); ST.lastJbd=s.jitterBufferDelay||0; ST.lastJbe=s.jitterBufferEmittedCount||0;
             if(je>0) ST.jbMs=Math.round(1000*jd/je); ST.kbps=Math.round(((s.bytesReceived||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesReceived||0; }
-          if(s.type==='outbound-rtp'&&s.kind==='video'){ ST.encFps=s.framesEncoded-(ST.lastEnc||0); ST.lastEnc=s.framesEncoded; ST.kbps=Math.round(((s.bytesSent||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesSent||0; }
+          if(s.type==='outbound-rtp'&&s.kind==='video'){ ST.qlr=s.qualityLimitationReason||''; ST.encImpl=s.encoderImplementation||''; if(s.codecId&&rep.get) { var cd=rep.get(s.codecId); if(cd) ST.codec=(cd.mimeType||'').replace('video/',''); } ST.encFps=s.framesEncoded-(ST.lastEnc||0); ST.lastEnc=s.framesEncoded; ST.kbps=Math.round(((s.bytesSent||0)-(ST.lastBytes||0))*8/1000); ST.lastBytes=s.bytesSent||0; }
         });
         if(pair){ if(pair.currentRoundTripTime) ST.rtt=pair.currentRoundTripTime*1000;
           var lc=cands[pair.localCandidateId], rc=cands[pair.remoteCandidateId];
@@ -400,7 +403,7 @@
         var gfps=DG.lastT&&dt>0?Math.round((f-DG.lastF)/dt):0, sfps=DG.lastT&&dt>0?Math.round(((ST.frames||0)-(DG.lastS||0))/dt):0;
         DG.lastF=f; DG.lastS=ST.frames||0;
         var mem=''; try{ if(performance.memory) mem=' · หน่วยความจำ '+Math.round(performance.memory.usedJSHeapSize/1048576)+'MB'; }catch(_){ }
-        line='วิเคราะห์ P1: เกม '+gfps+' fps · วาดภาพส่ง '+sfps+' fps · ส่งจริง '+(ST.encFps||0)+' fps · หน้าเว็บสะดุดสูงสุด '+Math.round(DG.lag)+'ms · ping '+Math.round(ST.rtt||0)+'ms'+mem;
+        var QL={cpu:'CPU',bandwidth:'เน็ต',other:'อื่น ๆ',none:'ไม่มี'}; line='วิเคราะห์ P1: เกม '+gfps+' fps · วาดภาพส่ง '+sfps+' fps · ส่งจริง '+(ST.encFps||0)+' fps (ตันที่ '+(QL[ST.qlr]||ST.qlr||'-')+' · '+(ST.codec||'-')+' '+(ST.encImpl||'')+') · หน้าเว็บสะดุดสูงสุด '+Math.round(DG.lag)+'ms · ping '+Math.round(ST.rtt||0)+'ms'+mem;
       } else {
         line='วิเคราะห์ P2: ภาพ '+(ST.decFps||0)+' fps · บัฟเฟอร์ภาพ '+(ST.jbMs||0)+'ms · หน้าเว็บสะดุดสูงสุด '+Math.round(DG.lag)+'ms · ping '+Math.round(ST.rtt||0)+'ms';
       }
