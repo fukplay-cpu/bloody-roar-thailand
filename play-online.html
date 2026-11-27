@@ -4083,6 +4083,8 @@ try {
       ST.restartDraw=function(){ drawGen++; loop(drawGen); };
       function draw(){
         if(ST.useDirect||performance.now()-(ST.grabAt||0)<500) return;
+        // ไม่เกิน ~60 ครั้ง/วินาที: จอ 120–165Hz เรียกทุกรอบจอ (165 ครั้ง/วินาที) → การ์ดจออ่านภาพซ้ำเปล่า ๆ จนเกมช้าลง
+        var tn=performance.now(), nx=ST.drawN||0; if(tn<nx-4) return; ST.drawN=(tn-nx>50?tn:nx)+16.67;
         try{
           var s=stGameCanvas(); if(!s||!s.width) return;
           var w=Math.min(ST.capW,s.width), h=Math.round(w*s.height/s.width)||480;
