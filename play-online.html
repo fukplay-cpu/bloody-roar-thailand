@@ -4093,7 +4093,8 @@ try {
         }catch(_){ }
       }
       ST.restartDraw();
-      var ms=cv.captureStream(60);
+      // ไม่ใส่ค่าเฟรมเรต: ส่ง 1 ภาพต่อการวาด 1 ครั้งพอดี (ใส่ 60 แล้วภาพที่วาดห่างกันไม่ถึง 16.7ms ถูกทิ้ง → ส่งจริงตกเหลือ 45–50)
+      var ms=cv.captureStream();
       ST.media=ms; stAddAudio();
       // ตรวจว่าวาดสำเนาได้จริง (ไม่ดำล้วน) — ถ้าไม่ได้ ลองส่ง canvas ของเกมตรงๆ
       function check(){
