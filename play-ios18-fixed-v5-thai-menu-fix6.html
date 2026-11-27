@@ -4351,7 +4351,7 @@ void main()
     // ตัดสินแมตช์ 2–2: ใช้ได้เมื่อเรียนรู้จากแมตช์ชนะ ≥2 และแพ้ ≥2 แล้ว
     // ใช้แบบ B (คู่ค่า P1/P2 ที่ฝ่ายแพ้เป็น 0) ก่อน เพราะแม่นกว่า · แบบ A ใช้เมื่อเหลือไม่เกิน 500 จุดเท่านั้น
     function rkJudge(S){ if(!S||!LN.A||LN.n1<2||LN.n2<2) return 0; var v1=0,v2=0, A=LN.A, use='';
-      if(LN.B.length>=1&&LN.B.length<=500){ use='B'; LN.B.forEach(function(o){ if(lnB(S,o,1)) v1++; else if(lnB(S,o,2)) v2++; }); }
+      if(LN.B.length>=1&&LN.B.length<=20000){ use='B'; LN.B.forEach(function(o){ if(lnB(S,o,1)) v1++; else if(lnB(S,o,2)) v2++; }); }
       else if(A.o.length>=1&&A.o.length<=500){ use='A'; for(var i=0;i<A.o.length;i++){ var x=S[A.o[i]]; if(x===A.v1[i]) v1++; else if(x===A.v2[i]) v2++; } }
       RK.judge=(use||'-')+' '+v1+':'+v2; if(v1+v2<1) return 0;
       if(v1>=2*v2+1) return 1; if(v2>=2*v1+1) return 2; return 0; }
