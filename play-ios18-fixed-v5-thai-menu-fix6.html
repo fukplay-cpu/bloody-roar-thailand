@@ -4171,7 +4171,8 @@ void main()
           if(RP.base<0){ rpOut('กำลังหาตำแหน่ง RAM…'); var e=await rpFindBase(); if(e){ rpOut('❌ '+e); return; } }
           d.hidden=true; await new Promise(function(r){ setTimeout(r,150); });
           var H=rpHeap(), cur=H.slice(RP.base,RP.base+0x200000); d.hidden=false;
-          var S=RV[t]||(RV[t]={labels:[],first:null,offs:null,vals:[]});
+          var S=RV[t]||(RV[t]={labels:[],first:null,offs:null,vals:[],full:[]});
+          if(!S.full) S.full=[]; if(S.full.length<12) S.full.push({l:lab,d:cur});
           if(!S.first&&!S.offs){ S.first=cur; S.labels.push(lab); }
           else{
             if(!S.offs){ // ครั้งที่ 2: คัดจาก RAM ทั้งก้อน
@@ -4187,8 +4188,27 @@ void main()
           rpOut('✅ '+rvName(t)+' = '+lab+'\n'+rvInfo(t));
         };
         document.getElementById('rv-clear').onclick=function(){ delete RV[rvT()]; rpOut('ล้าง "'+rvName(rvT())+'" แล้ว'); };
+        // แบบยอมให้กดผิดได้ 1 ครั้ง: ใช้เมื่อแบบเข้มงวดไม่เหลือจุดเลย (เช่นใส่ตัวเลขผิดไป 1 ครั้ง)
+        function rvTolerant(S){
+          var F=S.full||[]; if(F.length<4) return null;
+          var labs=[], byL={}; F.forEach(function(f,i){ if(!byL[f.l]){ byL[f.l]=[]; labs.push(f.l); } byL[f.l].push(i); });
+          if(labs.length<3) return null;
+          var N=F[0].d.length, res=[], maxBad=Math.max(1,Math.floor(F.length/6));
+          for(var i=0;i<N;i++){
+            var bad=0, maj={}, used={}, ok=true;
+            for(var a=0;a<labs.length&&ok;a++){ var ix=byL[labs[a]], cnt={}, best=-1, bc=0;
+              for(var b=0;b<ix.length;b++){ var v=F[ix[b]].d[i]; cnt[v]=(cnt[v]||0)+1; if(cnt[v]>bc){ bc=cnt[v]; best=v; } }
+              bad+=ix.length-bc; if(bad>maxBad||used[best]){ ok=false; break; } used[best]=1; maj[labs[a]]=best; }
+            if(!ok) continue;
+            var exact=true, near=true; labs.forEach(function(l){ if(maj[l]!==l) exact=false; if(Math.abs(maj[l]-l)>1) near=false; });
+            res.push([i,maj,bad*10+(exact?0:(near?1:4))]); if(res.length>20000) break;
+          }
+          res.sort(function(x,y){ return x[2]-y[2]||x[0]-y[0]; });
+          return {n:F.length, kinds:labs.length, total:res.length, top:res.slice(0,12), tolerant:true, bad:res.map(function(r){ return Math.floor(r[2]/10); })};
+        }
         function rvAnalyze(t){
-          var S=RV[t]; if(!S||!S.offs) return null; var u={}; S.labels.forEach(function(l){ u[l]=1; });
+          var S=RV[t]; if(!S||!S.offs) return null;
+          if(S.offs.length===0){ var TA=rvTolerant(S); if(TA) return TA; } var u={}; S.labels.forEach(function(l){ u[l]=1; });
           var res=[];
           for(var k=0;k<S.offs.length;k++){ var exact=true, near=true, pairs={};
             for(var j=0;j<S.labels.length;j++){ var v=S.vals[j][k], l=S.labels[j]; pairs[l]=v; if(v!==l) exact=false; if(Math.abs(v-l)>1) near=false; }
@@ -4202,7 +4222,7 @@ void main()
         }
         document.getElementById('rv-go').onclick=function(){ var t=rvT(), A=rvAnalyze(t); if(!A){ rpOut('เก็บอย่างน้อย 2 ครั้งก่อน'); return; }
           var lines=A.top.map(function(r){ return '0x'+r[0].toString(16).toUpperCase()+' : '+Object.keys(r[1]).map(function(l){ return l+'→'+r[1][l]; }).join(' '); });
-          var warn=A.kinds<3?'\n⚠️ ควรมีตัวเลขต่างกันอย่างน้อย 3 แบบ':'';
+          var warn=(A.kinds<3?'\n⚠️ ควรมีตัวเลขต่างกันอย่างน้อย 3 แบบ':'')+(A.tolerant?'\n(แบบเข้มงวดไม่เหลือ → ใช้แบบยอมให้ตัวเลขผิดได้บางครั้ง)':'');
           RP.rvLast=RP.rvLast||{}; RP.rvLast[t]=A.top.map(function(r){ return [r[0],r[1]]; });
           try{ localStorage.setItem('br2_value_probe',JSON.stringify(RP.rvLast)); }catch(_){ }
           rpOut(rvName(t)+' · เหลือ '+A.total+' จุด'+warn+'\n'+(lines.join('\n')||'ไม่เหลือจุดไหนเลย — ลองล้างหัวข้อนี้แล้วเก็บใหม่')); };
