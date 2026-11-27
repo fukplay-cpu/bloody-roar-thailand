@@ -4298,6 +4298,12 @@ void main()
       b.style.cssText='position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:59;background:rgba(10,10,14,.8);border:1px solid #c9a24b;border-radius:999px;padding:3px 12px;color:#ffd27a;font:600 12px system-ui;pointer-events:none;white-space:nowrap';
       b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.borderRadius='12px'; b.style.textAlign='center';
+      // แตะป้าย = คัดลอกผลการเรียนรู้ (ส่งให้ Claude ดู)
+      b.style.pointerEvents='auto'; b.style.cursor='pointer';
+      b.addEventListener('click',function(){ var L=window.__br2RankedLearn&&window.__br2RankedLearn(), d={n1:L.n1,n2:L.n2,B:LN.B,A:LN.A&&LN.A.o.length<=300?LN.A:(LN.A?LN.A.o.length:null)};
+        var t='BR2LEARN '+JSON.stringify(d), done=function(ok){ rkBanner(ok?'📋 คัดลอกแล้ว':'คัดลอกไม่ได้', ok?'วางในแชตส่งให้ Claude ได้เลย':''); };
+        try{ navigator.clipboard.writeText(t).then(function(){ done(true); },function(){ fb(); }); }catch(_){ fb(); }
+        function fb(){ try{ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); var ok=document.execCommand('copy'); ta.remove(); done(ok); }catch(e){ done(false); } } });
       document.body.appendChild(b); }
     function rkDbg(){ var e=document.getElementById('rk-b2'); if(!e) return; var H=rpHeap(); if(!H||RP.base<0) return;
       var g=function(l){ return l.map(function(o){ return H[RP.base+o]; }).join(','); };
