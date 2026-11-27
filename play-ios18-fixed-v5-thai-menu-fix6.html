@@ -4132,6 +4132,11 @@ void main()
           +'<button type="button" id="rp-go" style="width:100%;margin-top:6px">วิเคราะห์</button>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rp-copy" style="display:none">คัดลอกผล</button><button type="button" id="rp-reset">ล้างตัวอย่าง</button></div>'
           +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rp-rec">⏺ บันทึกค่า</button><button type="button" id="rp-reccopy">คัดลอกบันทึก</button></div>'
+          +'<div style="border-top:1px solid #444;margin-top:10px;padding-top:8px"><strong>🔢 หาค่าตามตัวเลข</strong>'
+          +'<div style="font-size:12px;color:#bbb;margin:4px 0">เลือกหัวข้อ → ตั้งค่าในเกม → ใส่ตัวเลขที่เกมแสดง → กด "เก็บค่านี้" · ทำ 4–6 ครั้ง ให้ตัวเลขต่างกันอย่างน้อย 3 แบบ → กด "วิเคราะห์"</div>'
+          +'<select id="rv-topic" style="width:100%;margin-bottom:6px"><option value="rounds">จำนวนยก (ROUNDS)</option><option value="time">เวลาต่อยก (TIME)</option><option value="damage">ดาเมจ (DAMAGE)</option><option value="level">ระดับความยาก (LEVEL)</option><option value="p1win">ยกที่ P1 ชนะไปแล้ว</option><option value="p2win">ยกที่ P2 ชนะไปแล้ว</option></select>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><input id="rv-num" type="number" inputmode="numeric" placeholder="ตัวเลขที่เกมแสดง" style="min-width:0"><button type="button" id="rv-snap">เก็บค่านี้</button></div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px"><button type="button" id="rv-go">วิเคราะห์</button><button type="button" id="rv-clear">ล้างหัวข้อนี้</button><button type="button" id="rv-copy">คัดลอกผล</button></div></div>'
           +'<div id="rp-live" style="margin-top:8px;font-size:12px;color:#ffd27a"></div>'
           +'<pre id="rp-out" style="white-space:pre-wrap;font:12px ui-monospace,monospace;background:#000;border:1px solid #444;border-radius:8px;padding:8px;margin:8px 0 0;min-height:3em">พร้อม</pre>';
         document.body.appendChild(d); RP.el=d;
@@ -4153,6 +4158,55 @@ void main()
           var done=function(){ rpOut('คัดลอกแล้ว ✅ วางส่งในแชทกับ Claude ได้เลย'); };
           if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done,function(){ window.prompt('คัดลอกข้อความนี้',t); });
           else window.prompt('คัดลอกข้อความนี้',t); };
+        // ----- หาค่าตามตัวเลข: เก็บแบบคัดกรองทีละครั้ง (ไม่ต้องเก็บ RAM ทั้งก้อนหลายชุด) -----
+        var RV=window.__br2RV=window.__br2RV||{};
+        function rvT(){ return document.getElementById('rv-topic').value; }
+        function rvName(t){ var o=document.querySelector('#rv-topic option[value="'+t+'"]'); return o?o.textContent:t; }
+        function rvInfo(t){ var S=RV[t]; if(!S) return 'ยังไม่มีตัวอย่าง'; var u={}; S.labels.forEach(function(l){ u[l]=1; }); return 'เก็บแล้ว '+S.labels.length+' ครั้ง · ตัวเลขต่างกัน '+Object.keys(u).length+' แบบ ('+S.labels.join(', ')+') · เหลือจุดที่เป็นไปได้ '+(S.offs?S.offs.length:'(ทั้งหมด)'); }
+        document.getElementById('rv-topic').onchange=function(){ rpOut(rvName(rvT())+'\n'+rvInfo(rvT())); };
+        document.getElementById('rv-snap').onclick=async function(){
+          var t=rvT(), raw=document.getElementById('rv-num').value.trim(), lab=parseInt(raw,10);
+          if(raw===''||isNaN(lab)){ rpOut('ใส่ตัวเลขที่เกมแสดงก่อน (ถ้าเป็น ∞ ใส่ 0)'); return; }
+          if(!ng){ rpOut('ยังไม่ได้เปิดเกม'); return; }
+          if(RP.base<0){ rpOut('กำลังหาตำแหน่ง RAM…'); var e=await rpFindBase(); if(e){ rpOut('❌ '+e); return; } }
+          d.hidden=true; await new Promise(function(r){ setTimeout(r,150); });
+          var H=rpHeap(), cur=H.slice(RP.base,RP.base+0x200000); d.hidden=false;
+          var S=RV[t]||(RV[t]={labels:[],first:null,offs:null,vals:[]});
+          if(!S.first&&!S.offs){ S.first=cur; S.labels.push(lab); }
+          else{
+            if(!S.offs){ // ครั้งที่ 2: คัดจาก RAM ทั้งก้อน
+              var f=S.first, l0=S.labels[0], keep=[];
+              for(var i=0;i<f.length;i++){ if((lab===l0)===(cur[i]===f[i])) keep.push(i); }
+              S.offs=Int32Array.from(keep); S.vals=[Uint8Array.from(keep,function(o){ return f[o]; })]; S.first=null;
+            }
+            var offs=S.offs, nv=Uint8Array.from(offs,function(o){ return cur[o]; }), ok=[];
+            for(var k=0;k<offs.length;k++){ var good=true; for(var j=0;j<S.vals.length;j++){ if((S.labels[j]===lab)!==(S.vals[j][k]===nv[k])){ good=false; break; } } if(good) ok.push(k); }
+            S.offs=Int32Array.from(ok,function(k){ return offs[k]; }); S.vals=S.vals.map(function(v){ return Uint8Array.from(ok,function(k){ return v[k]; }); }); S.vals.push(Uint8Array.from(ok,function(k){ return nv[k]; }));
+            S.labels.push(lab);
+          }
+          rpOut('✅ '+rvName(t)+' = '+lab+'\n'+rvInfo(t));
+        };
+        document.getElementById('rv-clear').onclick=function(){ delete RV[rvT()]; rpOut('ล้าง "'+rvName(rvT())+'" แล้ว'); };
+        function rvAnalyze(t){
+          var S=RV[t]; if(!S||!S.offs) return null; var u={}; S.labels.forEach(function(l){ u[l]=1; });
+          var res=[];
+          for(var k=0;k<S.offs.length;k++){ var exact=true, near=true, pairs={};
+            for(var j=0;j<S.labels.length;j++){ var v=S.vals[j][k], l=S.labels[j]; pairs[l]=v; if(v!==l) exact=false; if(Math.abs(v-l)>1) near=false; }
+            res.push([S.offs[k], pairs, exact?0:(near?1:2)]); }
+          res.sort(function(a,b){ return a[2]-b[2]||a[0]-b[0]; });
+          return {n:S.labels.length, kinds:Object.keys(u).length, total:res.length, top:res.slice(0,12)};
+        }
+        document.getElementById('rv-go').onclick=function(){ var t=rvT(), A=rvAnalyze(t); if(!A){ rpOut('เก็บอย่างน้อย 2 ครั้งก่อน'); return; }
+          var lines=A.top.map(function(r){ return '0x'+r[0].toString(16).toUpperCase()+' : '+Object.keys(r[1]).map(function(l){ return l+'→'+r[1][l]; }).join(' '); });
+          var warn=A.kinds<3?'\n⚠️ ควรมีตัวเลขต่างกันอย่างน้อย 3 แบบ':'';
+          RP.rvLast=RP.rvLast||{}; RP.rvLast[t]=A.top.map(function(r){ return [r[0],r[1]]; });
+          try{ localStorage.setItem('br2_value_probe',JSON.stringify(RP.rvLast)); }catch(_){ }
+          rpOut(rvName(t)+' · เหลือ '+A.total+' จุด'+warn+'\n'+(lines.join('\n')||'ไม่เหลือจุดไหนเลย — ลองล้างหัวข้อนี้แล้วเก็บใหม่')); };
+        document.getElementById('rv-copy').onclick=function(){ var all={}; try{ all=JSON.parse(localStorage.getItem('br2_value_probe')||'{}'); }catch(_){ }
+          Object.keys(RV).forEach(function(t){ var A=rvAnalyze(t); if(A) all[t]=A.top.map(function(r){ return [r[0],r[1]]; }); });
+          var txt='BR2VAL '+JSON.stringify(all);
+          var done=function(){ rpOut('คัดลอกแล้ว ✅ (ทุกหัวข้อ) วางส่งในแชทกับ Claude ได้เลย'); };
+          if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done,function(){ window.prompt('คัดลอกข้อความนี้',txt); }); else window.prompt('คัดลอกข้อความนี้',txt); };
         setInterval(function(){ if(d.hidden) return; br2FightPoll().then(function(st){ var el=document.getElementById('rp-live'); if(el) el.textContent='สถานะตอนนี้: '+(st===null?'กำลังตรวจ…':(st?'⚔️ กำลังสู้':'— ไม่ได้สู้'))+' ('+Math.max(0,FD.score)+'/'+FD.total+')'+(FIGHT_LEARNED?' · ใช้ค่าที่เรียนรู้':''); }); },400);
       }
       RP.el.hidden=false;
