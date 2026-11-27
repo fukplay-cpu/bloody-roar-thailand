@@ -346,6 +346,7 @@
       if(d.t==='sh'){ if(stRole()===1) stHostOffer().catch(function(e){ stLog('สร้างการเชื่อมต่อไม่สำเร็จ: '+(e.message||e),'err'); }); return true; }
       // อีกเครื่องยังส่งปุ่ม/สถานะมาอยู่ = ไม่ได้พับจอแล้ว → ปิดป้าย "พับจออยู่" (กันข้อความ "กลับมาแล้ว" หาย)
       if(ST.peerAway&&(d.t==='si'||d.t==='sf'||d.t==='sm')) stPeerAway(false, stRole()===1?2:1);
+      if(d.t==='rk'){ if(stRole()===2&&typeof window.__br2RankedShow==='function') window.__br2RankedShow(d); return true; }
       if(d.t==='si'){ if(stRole()===1) stOnInput(d); return true; }
       if(d.t==='sm'){ if(stRole()===1) stOnMacro(d); return true; }
       if(d.t==='sa'){ stPeerAway(!!d.a, d.p); return true; }
@@ -411,6 +412,8 @@
       if(DG.bad>=5&&Date.now()-DG.healAt>30000){ DG.bad=0; DG.healAt=Date.now(); stLog('ภาพหน่วงสะสม ('+ST.jbMs+'ms) → ต่อภาพใหม่อัตโนมัติ','err'); stClosePc(); stHelloSoon(0); }
     }
     setInterval(function(){ stHeal(); if(++DG.tick%30===0) stDiag(); },1000);
+    // โหมดจัดอันดับ: P1 ส่งผลแมตช์ให้ P2 เห็นด้วย
+    window.__br2RankedSend=function(r){ try{ lsSendRaw(r); }catch(_){ } };
     window.__br2Stream={ST:ST,diag:stDiag,hostMedia:function(){ return stHostMedia(); },ng:function(){ return ng; }}; // สำหรับตรวจสอบ/ทดสอบ
     // ออกจากหน้าเกม / สลับแอป: หยุดเสียงและวิดีโอ (iOS เล่นเสียงของ <video> ต่อในพื้นหลังได้)
     // คอม (ไม่ใช่มือถือ/แท็บเล็ต): พับจอหรือสลับหน้าต่างแล้วเกมยังเดินต่อ ไม่หลุดจากเพื่อน
