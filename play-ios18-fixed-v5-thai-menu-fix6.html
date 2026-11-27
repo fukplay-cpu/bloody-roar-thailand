@@ -3987,6 +3987,22 @@ void main()
       try{ var r=await robustSaveState(); await idbSet('autostate:'+romId, r&&r.state?r.state:r); histSet(romId,{hasState:true,autoTs:Date.now()}); }catch(_){ }
     }, 30000); }
     // Reprise DIRECTE depuis les disques gardés : reconstruit des File et relance sans re-sélection.
+    // กันจอดำ: ถ้าโหลดเซฟแล้วเกมพัง (หน้าค้างดำ) → รีเฟรชครั้งถัดไปจะข้ามเซฟนั้นและลบเซฟอัตโนมัติที่เสียทิ้ง
+    async function br2GuardedLoad(st,isAuto){
+      var G='br2_resume_guard', g=null; try{ g=localStorage.getItem(G); }catch(_){ }
+      if(g&&g.split('|')[0]===String(romId)){
+        try{ localStorage.removeItem(G); }catch(_){ }
+        if(isAuto){ try{ await idbSet('autostate:'+romId,null); histSet(romId,{autoTs:0}); }catch(_){ } }
+        log('เซฟล่าสุดเปิดแล้วเกมค้างเมื่อครั้งก่อน → ข้ามเซฟนั้น เริ่มเกมใหม่แทน'+(isAuto?' (ลบเซฟอัตโนมัติที่เสียแล้ว)':''),'err');
+        try{ showLog(); }catch(_){ } return false;
+      }
+      try{ localStorage.setItem(G,romId+'|'+(isAuto?'auto':'man')); }catch(_){ }
+      await robustLoadState(st);
+      // ถ้าเกมเดินต่อได้ 5 วินาทีหลังโหลด = เซฟใช้ได้ → ยกเลิกตัวกัน
+      var f0=(window.__br2FrameInfo&&window.__br2FrameInfo().frame)||0;
+      setTimeout(function(){ var f1=(window.__br2FrameInfo&&window.__br2FrameInfo().frame)||0; if(f1>f0+60){ try{ localStorage.removeItem(G); }catch(_){ } } },5000);
+      return true;
+    }
     async function resumeFromStored(id){
       var rec=await getStoredDiscs(id);
       if(!rec||!rec.files||!rec.files.length){ pendingResumeId=id; log('Disques introuvables en mémoire — re-sélectionne.','muted'); document.getElementById('file-rom').click(); return; }
@@ -4872,7 +4888,7 @@ void main()
           var _man=await idbGet('state:'+romId), _aut=await idbGet('autostate:'+romId);
           await histAdd({id:romId,name:curName+' ('+discs.length+' CD)',size:totalSize,ext:'m3u',date:Date.now(),hasState:!!(_man||_aut),stateTs:_prev.stateTs||0,autoTs:_prev.autoTs||0,hasDiscs:_prev.hasDiscs||false});
           keepGameIfEnabled(romId, curName+' ('+discs.length+' CD)', totalSize, lastLoadedFiles);
-          if(pendingResumeId===romId){ var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0)); var _st=_useAuto?_aut:(_man||_aut); if(_st){ await robustLoadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); } }
+          if(pendingResumeId===romId){ var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0)); var _st=_useAuto?_aut:(_man||_aut); if(_st&&await br2GuardedLoad(_st,_useAuto)){ log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); } }
         }catch(_){ }
         pendingResumeId=null; startAutoSave();
       }catch(e){ showLog(); showStatus('Échec : '+(e&&(e.message||e))); setProgress(0); log('Échec multi-disque : '+(e&&(e.message||e)),'err'); }
@@ -4923,7 +4939,7 @@ void main()
           if(pendingResumeId===romId){
             var _useAuto=_aut&&(!_man||(_prev.autoTs||0)>(_prev.stateTs||0));
             var _st=_useAuto?_aut:(_man||_aut);
-            if(_st){ await robustLoadState(_st); log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); }
+            if(_st&&await br2GuardedLoad(_st,_useAuto)){ log('Reprise : sauvegarde '+(_useAuto?'auto':'manuelle')+' rechargée.','ok'); }
           }
         }catch(_){ }
         pendingResumeId=null;
