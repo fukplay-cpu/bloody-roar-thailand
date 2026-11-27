@@ -4296,7 +4296,7 @@ void main()
     function rkBadge(){ var b=document.getElementById('rk-badge'); if(b) return; b=document.createElement('div'); b.id='rk-badge';
       b.textContent='🏅 จัดอันดับ (ทดสอบ) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.cssText='position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:59;background:rgba(10,10,14,.8);border:1px solid #c9a24b;border-radius:999px;padding:3px 12px;color:#ffd27a;font:600 12px system-ui;pointer-events:none;white-space:nowrap';
-      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ v84) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
+      b.innerHTML='<span id="rk-b1"></span><div id="rk-b2" style="font:500 10px ui-monospace,monospace;color:#bbb;white-space:pre"></div>'; b.querySelector('#rk-b1').textContent='🏅 จัดอันดับ (ทดสอบ v85) · '+RK.MATCH_POINT+' ยก · 60 วิ · ดาเมจ '+RK.ATTACK;
       b.style.borderRadius='12px'; b.style.textAlign='center';
       // แตะป้าย = คัดลอกผลการเรียนรู้ (ส่งให้ Claude ดู)
       b.style.pointerEvents='auto'; b.style.cursor='pointer';
@@ -4335,11 +4335,13 @@ void main()
     function lnCount(){ return LN.A?LN.A.o.length+LN.B.length:-1; }
     // บันทึกแบบ B เสมอ (สำคัญที่สุด) · แบบ A บันทึกเฉพาะเมื่อเหลือไม่เกิน 4000 จุด
     function lnSave(){ try{ if(LN.A&&LN.B.length<=150000) localStorage.setItem(LN_KEY,JSON.stringify({n1:LN.n1,n2:LN.n2,A:LN.A.o.length<=4000?LN.A:{o:[],v1:[],v2:[],dropped:LN.A.o.length},B:LN.B})); }catch(_){ } }
+    // ภาพหน่วยความจำ: ใช้บัฟเฟอร์เดิมซ้ำ ไม่สร้างก้อนใหม่ 2MB ทุกครึ่งวินาที (ลดงานเก็บขยะ → หน้าเว็บไม่สะดุด)
+    function rkSnapNow(){ var H=rpHeap(); if(!RK.snapBuf) RK.snapBuf=new Uint8Array(0x200000); RK.snapBuf.set(H.subarray(RP.base,RP.base+0x200000)); return RK.snapBuf; }
     function rkLearn(w,S){ if(!S) return; if(w===1) LN.n1++; else LN.n2++;
       if(!LN.A){
-        if(!LN.pend||LN.pend.w===w){ LN.pend={w:w,S:S}; return; }
+        if(!LN.pend||LN.pend.w===w){ LN.pend={w:w,S:S.slice()}; return; }
         var S1=w===1?S:LN.pend.S, S2=w===1?LN.pend.S:S, ao=[], a1=[], a2=[], bo=[], o;
-        for(o=0;o<S1.length;o++){ if(S1[o]!==S2[o]&&!LN_EXC[o]){ ao.push(o); a1.push(S1[o]); a2.push(S2[o]); } }
+        /* แบบ A ไม่เรียนรู้แล้ว (หนัก และแบบ B แม่นกว่า) */
         for(o=0;o+LN_D+1<S1.length;o+=2){ if(lnB(S1,o,1)&&lnB(S2,o,2)) bo.push(o); }
         LN.A={o:ao,v1:a1,v2:a2}; LN.B=bo; LN.pend=null;
       } else {
@@ -4409,7 +4411,7 @@ void main()
       // ยกนี้เคยสู้แล้ว + หยุดสู้ต่อเนื่อง 2 วินาที + ตัวนับยกไม่ขยับ (ยกปกติฝ่ายที่ชนะยกจะได้ +1 เสมอ) → ฝ่ายที่ขาดอีก 1 ยกชนะ
       if(ok&&!RK.done&&key===RK.rs){ var fsx=(window.__rkFS!==undefined)?window.__rkFS:FD.state;
         if(fsx){ RK.fOn=true; RK.fOff=0; } else if(RK.fOn&&!RK.fOff) RK.fOff=now;
-        if(RK.fOn&&RK.fOff&&now-RK.fOff>=2000){ var Mf=MP-1, q1=a===Mf, q2=b===Mf, SS=rpHeap().slice(RP.base,RP.base+0x200000);
+        if(RK.fOn&&RK.fOff&&now-RK.fOff>=2000){ var Mf=MP-1, q1=a===Mf, q2=b===Mf, SS=rkSnapNow();
           if(q1&&!q2){ RK.judge='หยุดสู้ (P1 ขาด 1 ยก)'; rkLearn(1,SS); rkDeclare(1,a+1,b,'fs'); }
           else if(q2&&!q1){ RK.judge='หยุดสู้ (P2 ขาด 1 ยก)'; rkLearn(2,SS); rkDeclare(2,a,b+1,'fs'); }
           else if(q1&&q2){ var jf=rkJudge(SS); if(jf===1) rkDeclare(1,a+1,b,'fs'); else if(jf===2) rkDeclare(2,a,b+1,'fs'); else { RK.done=true; rkBanner('🏁 จบแมตช์ '+Mf+'–'+Mf,'ยกสุดท้ายยังตัดสินไม่ได้ (กำลังเรียนรู้โหมด VS)'); } } } }
@@ -4418,7 +4420,7 @@ void main()
         if(lw===1&&L0.a===M1b){ RK.judge='HP '+RK.live[0]+':'+RK.live[1]+' (ออก)'; rkDeclare(1,L0.a+1,L0.b,'hp'); }
         else if(lw===2&&L0.b===M1b){ RK.judge='HP '+RK.live[0]+':'+RK.live[1]+' (ออก)'; rkDeclare(2,L0.a,L0.b+1,'hp'); } }
       if(key===RK.cur&&ok&&RK.applied){ rkHpTrack(rpHeap(),RP.base); }
-      if(key===RK.cur){ if(ok&&now-(RK.snapT||0)>500){ RK.snap=rpHeap().slice(RP.base,RP.base+0x200000); RK.snapT=now; } return; } var prevK=RK.cur; RK.cur=key; if(ok&&(prevK==='✕'||prevK==null)){ RK.rs=key; RK.fOn=false; RK.fOff=0; } rkHpReset(); RK.hist.push(key); if(RK.hist.length>9) RK.hist.shift();
+      if(key===RK.cur){ if(ok&&now-(RK.snapT||0)>500){ RK.snap=rkSnapNow(); RK.snapT=now; } return; } var prevK=RK.cur; RK.cur=key; if(ok&&(prevK==='✕'||prevK==null)){ RK.rs=key; RK.fOn=false; RK.fOff=0; } rkHpReset(); RK.hist.push(key); if(RK.hist.length>9) RK.hist.shift();
       if(!ok) return;
       if(a===0&&b===0){ if(RK.lastValid&&(RK.lastValid.a||RK.lastValid.b)) rkEnd(); RK.done=false; RK.lastValid={a:0,b:0}; return; }
       if(!RK.done&&(a>=MP||b>=MP)){ rkDeclare(a>=MP?1:2,a,b); }
